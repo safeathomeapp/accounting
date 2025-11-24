@@ -34,10 +34,11 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from backend.config import settings
 from backend.database import SessionLocal, get_db
+from backend.sync import SyncScheduler
 
 # Configure logging
 logging.basicConfig(
@@ -56,6 +57,9 @@ app = FastAPI(
     docs_url="/api/v1/docs" if settings.debug else None,
     redoc_url="/api/v1/redoc" if settings.debug else None,
 )
+
+# Global scheduler instance
+_scheduler: Optional[SyncScheduler] = None
 
 # Add CORS middleware
 # Allows frontend to make requests to this API
@@ -265,7 +269,11 @@ async def list_transactions(db=Depends(get_db)) -> Dict[str, Any]:
 
 # Include sync routes
 from backend.api.sync_routes import router as sync_router
+from backend.api.job_routes import router as job_router
+from backend.api import job_routes as job_routes_module
+
 app.include_router(sync_router, prefix="/api/v1")
+app.include_router(job_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/ai", tags=["AI"])
@@ -300,10 +308,23 @@ async def startup_event() -> None:
     Called when the application starts.
     Use for initialization tasks (logging, database checks, etc.)
     """
+    global _scheduler
+
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
     logger.info(f"Database: {settings.database_url}")
+
+    # Initialize sync scheduler
+    try:
+        _scheduler = SyncScheduler(SessionLocal())
+        job_routes_module.set_scheduler(_scheduler)
+        _scheduler.start()
+        logger.info("Sync scheduler initialized and started")
+    except Exception as e:
+        logger.error(f"Failed to initialize sync scheduler: {e}", exc_info=True)
+        # Don't fail startup if scheduler fails, but log the error
+
     logger.info("Application started successfully")
 
 
@@ -315,7 +336,18 @@ async def shutdown_event() -> None:
     Called when the application is shutting down.
     Use for cleanup tasks (closing connections, saving state, etc.)
     """
+    global _scheduler
+
     logger.info(f"Shutting down {settings.app_name}")
+
+    # Stop sync scheduler
+    if _scheduler:
+        try:
+            _scheduler.stop()
+            logger.info("Sync scheduler stopped")
+        except Exception as e:
+            logger.error(f"Error stopping sync scheduler: {e}", exc_info=True)
+
     logger.info("Application shut down successfully")
 
 
