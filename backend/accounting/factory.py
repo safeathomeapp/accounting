@@ -69,6 +69,7 @@ class AccountingClientFactory:
     PLATFORM_CLIENTS: Dict[str, str] = {
         "xero": "backend.accounting.xero.client.XeroClient",
         "quickbooks": "backend.accounting.quickbooks.client.QuickBooksClient",
+        "mock": "backend.accounting.mock.client.MockClient",  # TEMPORARY: For development/testing only
         # "sage": "backend.accounting.sage.client.SageClient",  # Future
         # "freeagent": "backend.accounting.freeagent.client.FreeAgentClient",  # Future
     }
