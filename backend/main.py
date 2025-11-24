@@ -263,23 +263,9 @@ async def list_transactions(db=Depends(get_db)) -> Dict[str, Any]:
     }
 
 
-@app.get("/api/v1/sync", tags=["Sync"])
-async def sync_status(db=Depends(get_db)) -> Dict[str, Any]:
-    """
-    Get synchronization status.
-
-    Currently a placeholder. Will be implemented in Task 5 (Xero Adapter).
-
-    Args:
-        db: Database session (dependency injection)
-
-    Returns:
-        Sync status information
-    """
-    return {
-        "message": "Sync endpoint - Coming soon",
-        "status": "placeholder",
-    }
+# Include sync routes
+from backend.api.sync_routes import router as sync_router
+app.include_router(sync_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/ai", tags=["AI"])
