@@ -1,0 +1,335 @@
+# Multi-Platform AI Practice Management System
+# .gitignore
+
+# === CRITICAL: Never commit secrets ===
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+credentials.json
+secrets.json
+
+# === Python ===
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# === IDEs ===
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# === Operating Systems ===
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# === Databases ===
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# PostgreSQL
+*.sql~
+*.backup
+
+# === API & OAuth ===
+# OAuth tokens
+*token*.json
+*oauth*.json
+*refresh*.json
+
+# API keys and credentials
+api_keys.txt
+credentials.txt
+
+# === Project Specific ===
+# Mock client sensitive data
+mock-clients/**/credentials/
+mock-clients/**/tokens/
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Cache
+cache/
+.cache/
+*.cache
+
+# Backups
+backup/
+*.backup
+*.bak
+*.old
+
+# Output files (except in /mnt/user-data/outputs)
+output/
+outputs/
+*.output
+
+# Data files (sensitive)
+data/production/
+data/real-clients/
+
+# === AI & Knowledge Base ===
+# Don't ignore knowledge base, but ignore any API response caches
+knowledge-base/**/*.cache
+knowledge-base/**/*.pickle
+
+# === Frontend (when added) ===
+# dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Documentation ===
+# Don't ignore docs, but ignore build artifacts
+docs/_build/
+docs/.doctrees/
+
+# === Alembic (Database Migrations) ===
+# Don't ignore migrations, but ignore local testing
+alembic/versions/*.pyc
+
+# === Testing ===
+# Don't ignore tests, but ignore test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+test-results/
+*.pytest_cache
+
+# === Deployment ===
+# Deployment configs with secrets
+deployment/*.env
+deployment/secrets/
+
+# === Misc ===
+# TODO files that might contain sensitive info
+*TODO_PRIVATE*
+*NOTES_PRIVATE*
+
+# Large files
+*.dump
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# === ALLOWED (explicitly track these) ===
+!.env.example
+!.gitignore
+!README.md
