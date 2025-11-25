@@ -45,6 +45,10 @@ from backend.models.tax import (
     TaxType, TaxRate, TaxLiability, TaxAdjustment, TaxComplianceLog,
     TaxTypeCode, TaxPeriod, TaxLiabilityStatus, TaxAdjustmentType
 )
+from backend.models.analytics import (
+    Forecast, FinancialMetric, TrendAnalysis, KPI, DashboardWidget,
+    ForecastType, ForecastMethod, MetricType, TrendDirection
+)
 
 # Export all models for easy importing
 __all__ = [
@@ -72,4 +76,13 @@ __all__ = [
     "TaxPeriod",
     "TaxLiabilityStatus",
     "TaxAdjustmentType",
+    "Forecast",
+    "FinancialMetric",
+    "TrendAnalysis",
+    "KPI",
+    "DashboardWidget",
+    "ForecastType",
+    "ForecastMethod",
+    "MetricType",
+    "TrendDirection",
 ]
