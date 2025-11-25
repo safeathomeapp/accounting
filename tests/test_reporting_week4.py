@@ -285,18 +285,22 @@ class TestReportGenerator:
         db = Mock(spec=Session)
         org_id = uuid4()
 
-        # Setup mock organization
+        # Setup mock organization query
         mock_org = Mock()
-        mock_query = Mock()
-        db.query.return_value = mock_query
-        mock_query.filter_by.return_value.first.return_value = mock_org
+        org_query_mock = Mock()
+        org_query_mock.filter_by.return_value.first.return_value = mock_org
+
+        # Setup mock transactions query with smart filter chaining
+        mock_txns = [Mock(), Mock(), Mock()]
+        txn_query_mock = Mock()
+        # Make filter() return self so it can be chained, then .all() returns the list
+        txn_query_mock.filter.return_value = txn_query_mock
+        txn_query_mock.all.return_value = mock_txns
+
+        # Use side_effect to return different mocks for each db.query() call
+        db.query.side_effect = [org_query_mock, txn_query_mock]
 
         generator = ReportGenerator(db, org_id)
-
-        # Mock transactions query
-        mock_txns = [Mock(), Mock(), Mock()]
-        db.query.return_value = mock_query
-        mock_query.filter.return_value.filter.return_value.filter.return_value.all.return_value = mock_txns
 
         start = date(2025, 1, 1)
         end = date(2025, 12, 31)
@@ -313,43 +317,55 @@ class TestReportGenerator:
 
         # Setup mock organization
         mock_org = Mock()
-        mock_query = Mock()
-        db.query.return_value = mock_query
-        mock_query.filter_by.return_value.first.return_value = mock_org
+        org_query_mock = Mock()
+        org_query_mock.filter_by.return_value.first.return_value = mock_org
 
-        generator = ReportGenerator(db, org_id)
-
-        start = date(2025, 1, 1)
-        end = date(2025, 12, 31)
-
-        # Mock income accounts
+        # Mock account query chains with self-returning filter
         mock_income_account = Mock()
         mock_income_account.id = uuid4()
         mock_income_account.account_type = AccountType.INCOME
 
-        # Mock expense accounts
         mock_expense_account = Mock()
         mock_expense_account.id = uuid4()
         mock_expense_account.account_type = AccountType.EXPENSE
 
-        # First call: income accounts, second: expense accounts
-        db.query.return_value.filter.return_value.all.side_effect = [
-            [mock_income_account],  # revenue accounts
-            [mock_expense_account],  # expense accounts
-        ]
+        income_query_mock = Mock()
+        income_query_mock.filter.return_value = income_query_mock
+        income_query_mock.all.return_value = [mock_income_account]
 
-        # Mock transactions
+        expense_query_mock = Mock()
+        expense_query_mock.filter.return_value = expense_query_mock
+        expense_query_mock.all.return_value = [mock_expense_account]
+
+        # Mock transactions with self-returning filter
         mock_revenue_txn = Mock()
         mock_revenue_txn.total_amount = Decimal("100000.00")
 
         mock_expense_txn = Mock()
         mock_expense_txn.total_amount = Decimal("60000.00")
 
-        # Setup for get_transactions calls
-        db.query.return_value.filter.return_value.filter.return_value.filter.return_value.all.side_effect = [
-            [mock_revenue_txn],  # revenue transactions
-            [mock_expense_txn],  # expense transactions
+        revenue_txn_query_mock = Mock()
+        revenue_txn_query_mock.filter.return_value = revenue_txn_query_mock
+        revenue_txn_query_mock.all.return_value = [mock_revenue_txn]
+
+        expense_txn_query_mock = Mock()
+        expense_txn_query_mock.filter.return_value = expense_txn_query_mock
+        expense_txn_query_mock.all.return_value = [mock_expense_txn]
+
+        # Use side_effect to sequence all db.query() calls
+        # Order matters: queries are called in this sequence by generate_profit_loss
+        db.query.side_effect = [
+            org_query_mock,           # __init__ org lookup
+            income_query_mock,        # get income accounts (first Account query)
+            revenue_txn_query_mock,   # get revenue transactions (called inside get_transactions)
+            expense_query_mock,       # get expense accounts (second Account query)
+            expense_txn_query_mock,   # get expense transactions (called inside get_transactions)
         ]
+
+        generator = ReportGenerator(db, org_id)
+
+        start = date(2025, 1, 1)
+        end = date(2025, 12, 31)
 
         report = generator.generate_profit_loss(start, end)
 
@@ -365,27 +381,38 @@ class TestReportGenerator:
 
         # Setup mock organization
         mock_org = Mock()
-        mock_query = Mock()
-        db.query.return_value = mock_query
-        mock_query.filter_by.return_value.first.return_value = mock_org
+        org_query_mock = Mock()
+        org_query_mock.filter_by.return_value.first.return_value = mock_org
 
-        generator = ReportGenerator(db, org_id)
-
-        as_of = date(2025, 12, 31)
-
-        # Mock accounts
+        # Mock accounts with self-returning filter
         mock_asset_account = Mock()
         mock_asset_account.id = uuid4()
         mock_asset_account.name = "Cash"
         mock_asset_account.code = "1000"
         mock_asset_account.account_type = AccountType.ASSET
 
-        db.query.return_value.filter.return_value.all.return_value = [mock_asset_account]
+        asset_query_mock = Mock()
+        asset_query_mock.filter.return_value = asset_query_mock
+        asset_query_mock.all.return_value = [mock_asset_account]
 
-        # Mock transactions
+        # Mock transactions with self-returning filter
         mock_txn = Mock()
         mock_txn.total_amount = Decimal("50000.00")
-        db.query.return_value.filter.return_value.filter.return_value.all.return_value = [mock_txn]
+
+        txn_query_mock = Mock()
+        txn_query_mock.filter.return_value = txn_query_mock
+        txn_query_mock.all.return_value = [mock_txn]
+
+        # Use side_effect to sequence db.query() calls
+        db.query.side_effect = [
+            org_query_mock,      # __init__ org lookup
+            asset_query_mock,    # get accounts
+            txn_query_mock,      # get transactions
+        ]
+
+        generator = ReportGenerator(db, org_id)
+
+        as_of = date(2025, 12, 31)
 
         report = generator.generate_balance_sheet(as_of)
 
@@ -449,27 +476,38 @@ class TestReportGenerator:
 
         # Setup mock organization
         mock_org = Mock()
-        mock_query = Mock()
-        db.query.return_value = mock_query
-        mock_query.filter_by.return_value.first.return_value = mock_org
+        org_query_mock = Mock()
+        org_query_mock.filter_by.return_value.first.return_value = mock_org
 
-        generator = ReportGenerator(db, org_id)
-
-        as_of = date(2025, 12, 31)
-
-        # Mock accounts
+        # Mock accounts with self-returning filter
         mock_account = Mock()
         mock_account.id = uuid4()
         mock_account.name = "Cash"
         mock_account.code = "1000"
         mock_account.account_type = AccountType.ASSET
 
-        db.query.return_value.filter.return_value.all.return_value = [mock_account]
+        account_query_mock = Mock()
+        account_query_mock.filter.return_value = account_query_mock
+        account_query_mock.all.return_value = [mock_account]
 
-        # Mock transactions
+        # Mock transactions with self-returning filter
         mock_txn = Mock()
         mock_txn.total_amount = Decimal("50000.00")
-        db.query.return_value.filter.return_value.filter.return_value.all.return_value = [mock_txn]
+
+        txn_query_mock = Mock()
+        txn_query_mock.filter.return_value = txn_query_mock
+        txn_query_mock.all.return_value = [mock_txn]
+
+        # Use side_effect to sequence db.query() calls
+        db.query.side_effect = [
+            org_query_mock,        # __init__ org lookup
+            account_query_mock,    # get accounts
+            txn_query_mock,        # get transactions
+        ]
+
+        generator = ReportGenerator(db, org_id)
+
+        as_of = date(2025, 12, 31)
 
         tb = generator.generate_trial_balance(as_of)
 

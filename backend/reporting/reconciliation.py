@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
@@ -178,7 +178,7 @@ class ReconciliationEngine:
             is_reconciled=(variance == Decimal("0.00")),
             cleared_transaction_count=len(cleared_transaction_ids),
             total_transaction_count=len(self.transaction_cache),
-            last_reconciled_at=datetime.utcnow(),
+            last_reconciled_at=datetime.now(timezone.utc),
             reconciled_by=reconciled_by,
         )
 

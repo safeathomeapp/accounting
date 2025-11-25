@@ -3,7 +3,11 @@
     "allow": [
       "Bash(git --version)",
       "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\" --version)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python -m pytest:*)",
+      "Bash(. venv/Scripts/activate)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nMonth 2 Week 4 Complete: All Tests Fixed and Passing\n\n✅ Fixed all 4 failing database mock tests in test_reporting_week4.py:\n- test_get_transactions: Proper side_effect sequencing for org and transaction queries\n- test_generate_profit_loss_simple: Fixed query execution order and mock chaining\n- test_generate_balance_sheet: Implemented self-returning filter mocks for chain support\n- test_generate_trial_balance: Proper mock setup with iterable transaction returns\n\n✅ Fixed datetime deprecation warning:\n- Updated backend/reporting/reconciliation.py to use datetime.now(timezone.utc)\n  instead of deprecated datetime.utcnow()\n\n✅ Test Results:\n- All 353 tests passing (100%)\n- All database mocks properly configured with self-returning filter chains\n- SQLAlchemy query chaining now properly mocked\n\nThe key insight: Mock filters must return self to support chaining, then .all()\nreturns the final result. This matches SQLAlchemy''s actual query builder pattern.\n\nReady for Month 3 feature development!\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
