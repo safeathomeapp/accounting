@@ -1,6 +1,7 @@
 """Repository pattern for analytics data persistence.
 
-Handles all database operations for analytics models.
+Handles all database operations for analytics models with
+organization isolation enforcement.
 """
 
 from uuid import UUID
@@ -15,26 +16,41 @@ from backend.models.analytics import (
     Forecast, FinancialMetric, TrendAnalysis, KPI, DashboardWidget,
     ForecastType, ForecastMethod, MetricType, TrendDirection
 )
+from backend.analytics.auth import OrganizationAuthorizer, OrgAuthError
 
 
 class ForecastRepository:
-    """Repository for Forecast persistence."""
+    """Repository for Forecast persistence with organization isolation."""
 
     def __init__(self, session: Session):
         """Initialize with database session."""
         self.session = session
+        self.auth = OrganizationAuthorizer(session)
 
-    def create(self, forecast: Forecast) -> Forecast:
-        """Create a new forecast."""
+    def create(self, forecast: Forecast, requesting_org_id: Optional[UUID] = None) -> Forecast:
+        """Create a new forecast with org validation."""
+        # Validate org access
+        org_id = self.auth.validate_org_access(
+            forecast.organization_id, requesting_org_id, "write"
+        )
         self.session.add(forecast)
         self.session.commit()
+        self.auth.log_access(org_id, "create", "forecast", forecast.id)
         return forecast
 
-    def get_by_id(self, forecast_id: UUID) -> Optional[Forecast]:
-        """Get forecast by ID."""
-        return self.session.query(Forecast).filter(
+    def get_by_id(
+        self, forecast_id: UUID, requesting_org_id: Optional[UUID] = None
+    ) -> Optional[Forecast]:
+        """Get forecast by ID with org validation."""
+        forecast = self.session.query(Forecast).filter(
             Forecast.id == forecast_id
         ).first()
+
+        if forecast and requesting_org_id:
+            self.auth.validate_entity_org(forecast.organization_id, requesting_org_id, "forecast")
+            self.auth.log_access(requesting_org_id, "read", "forecast", forecast_id)
+
+        return forecast
 
     def get_by_org(
         self,
@@ -88,16 +104,21 @@ class ForecastRepository:
 
 
 class MetricRepository:
-    """Repository for FinancialMetric persistence."""
+    """Repository for FinancialMetric persistence with organization isolation."""
 
     def __init__(self, session: Session):
         """Initialize with database session."""
         self.session = session
+        self.auth = OrganizationAuthorizer(session)
 
-    def create(self, metric: FinancialMetric) -> FinancialMetric:
-        """Create a new metric."""
+    def create(self, metric: FinancialMetric, requesting_org_id: Optional[UUID] = None) -> FinancialMetric:
+        """Create a new metric with org validation."""
+        org_id = self.auth.validate_org_access(
+            metric.organization_id, requesting_org_id, "write"
+        )
         self.session.add(metric)
         self.session.commit()
+        self.auth.log_access(org_id, "create", "metric", metric.id)
         return metric
 
     def get_by_org_and_type(
@@ -161,16 +182,21 @@ class MetricRepository:
 
 
 class TrendRepository:
-    """Repository for TrendAnalysis persistence."""
+    """Repository for TrendAnalysis persistence with organization isolation."""
 
     def __init__(self, session: Session):
         """Initialize with database session."""
         self.session = session
+        self.auth = OrganizationAuthorizer(session)
 
-    def create(self, trend: TrendAnalysis) -> TrendAnalysis:
-        """Create a new trend analysis."""
+    def create(self, trend: TrendAnalysis, requesting_org_id: Optional[UUID] = None) -> TrendAnalysis:
+        """Create a new trend analysis with org validation."""
+        org_id = self.auth.validate_org_access(
+            trend.organization_id, requesting_org_id, "write"
+        )
         self.session.add(trend)
         self.session.commit()
+        self.auth.log_access(org_id, "create", "trend", trend.id)
         return trend
 
     def get_by_org(self, organization_id: UUID) -> List[TrendAnalysis]:
@@ -209,16 +235,21 @@ class TrendRepository:
 
 
 class KPIRepository:
-    """Repository for KPI persistence."""
+    """Repository for KPI persistence with organization isolation."""
 
     def __init__(self, session: Session):
         """Initialize with database session."""
         self.session = session
+        self.auth = OrganizationAuthorizer(session)
 
-    def create(self, kpi: KPI) -> KPI:
-        """Create a new KPI."""
+    def create(self, kpi: KPI, requesting_org_id: Optional[UUID] = None) -> KPI:
+        """Create a new KPI with org validation."""
+        org_id = self.auth.validate_org_access(
+            kpi.organization_id, requesting_org_id, "write"
+        )
         self.session.add(kpi)
         self.session.commit()
+        self.auth.log_access(org_id, "create", "kpi", kpi.id)
         return kpi
 
     def get_by_org_and_code(
@@ -278,16 +309,21 @@ class KPIRepository:
 
 
 class DashboardWidgetRepository:
-    """Repository for DashboardWidget persistence."""
+    """Repository for DashboardWidget persistence with organization isolation."""
 
     def __init__(self, session: Session):
         """Initialize with database session."""
         self.session = session
+        self.auth = OrganizationAuthorizer(session)
 
-    def create(self, widget: DashboardWidget) -> DashboardWidget:
-        """Create a new widget."""
+    def create(self, widget: DashboardWidget, requesting_org_id: Optional[UUID] = None) -> DashboardWidget:
+        """Create a new widget with org validation."""
+        org_id = self.auth.validate_org_access(
+            widget.organization_id, requesting_org_id, "write"
+        )
         self.session.add(widget)
         self.session.commit()
+        self.auth.log_access(org_id, "create", "widget", widget.id)
         return widget
 
     def get_by_id(self, widget_id: UUID) -> Optional[DashboardWidget]:
