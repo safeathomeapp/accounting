@@ -7,7 +7,7 @@ from datetime import datetime, timezone, date
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import Column, String, Float, Boolean, DateTime, Integer, Date, Text, Numeric, ForeignKey, Enum
+from sqlalchemy import Column, String, Float, Boolean, DateTime, Integer, Date, Text, Numeric, ForeignKey, Enum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 import enum
 
@@ -166,12 +166,15 @@ class TrendAnalysis(Base):
 class KPI(Base):
     """Key Performance Indicator model."""
     __tablename__ = "kpis"
+    __table_args__ = (
+        UniqueConstraint('organization_id', 'code', 'period_date', name='kpis_org_code_date_unique'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     organization_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     name = Column(String(200), nullable=False)
-    code = Column(String(50), nullable=False, unique=True)  # e.g., "DSO", "CCC"
+    code = Column(String(50), nullable=False)  # e.g., "DSO", "CCC"
     description = Column(Text)
 
     period_date = Column(Date, nullable=False, index=True)
