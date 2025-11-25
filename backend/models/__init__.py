@@ -40,6 +40,7 @@ from backend.models.oauth_token import OAuthToken
 from backend.models.ai_analysis import AIAnalysisResult
 from backend.models.sync_history import SyncHistory
 from backend.models.audit_log import AuditLog
+from backend.models.currency import Currency, ExchangeRate, ConversionHistory, CurrencyCode, RateSource
 
 # Export all models for easy importing
 __all__ = [
@@ -53,4 +54,9 @@ __all__ = [
     "AIAnalysisResult",
     "SyncHistory",
     "AuditLog",
+    "Currency",
+    "ExchangeRate",
+    "ConversionHistory",
+    "CurrencyCode",
+    "RateSource",
 ]
