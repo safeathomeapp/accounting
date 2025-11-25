@@ -270,10 +270,12 @@ async def list_transactions(db=Depends(get_db)) -> Dict[str, Any]:
 # Include sync routes
 from backend.api.sync_routes import router as sync_router
 from backend.api.job_routes import router as job_router
+from backend.api.dashboard_routes import router as dashboard_router
 from backend.api import job_routes as job_routes_module
 
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(job_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
 
 
 @app.get("/api/v1/ai", tags=["AI"])
