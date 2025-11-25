@@ -8,7 +8,9 @@
       "Bash(for commit in 735be20 7e6a3f6 09116dd f5426e9 ea9f5a0 11087f7 bb92a4b 2c5d50c)",
       "Bash(do echo \"=== Commit $commit ===\")",
       "Bash(git commit:*)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(pytest:*)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []
