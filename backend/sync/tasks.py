@@ -3,16 +3,21 @@ Sync job tasks for scheduled execution.
 
 These are the actual tasks that get executed by the APScheduler
 background scheduler for automated data synchronization.
+
+Includes monitoring integration to emit real-time events for job status,
+metrics, and errors.
 """
 
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
+import asyncio
 
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal
 from backend.sync.engine import SyncEngine
 from backend.sync.retry import RetryManager
+from backend.sync.monitoring import SyncMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,8 @@ async def sync_all_platforms_job(
     This job is typically scheduled to run periodically (e.g., hourly
     for incremental syncs, weekly for full syncs).
 
+    Includes monitoring integration to emit real-time events.
+
     Args:
         organization_id: Organization UUID to sync
         db: Database session (creates new if not provided)
@@ -40,8 +47,16 @@ async def sync_all_platforms_job(
     else:
         close_db = False
 
+    job_id = uuid4()  # Generate unique job ID for this sync operation
+    monitor = SyncMonitor(db)
+
     try:
         logger.info(f"[JOB] Syncing all platforms for organization {organization_id}")
+
+        # Emit job started event (async, no await to avoid blocking)
+        asyncio.create_task(
+            monitor.on_sync_started(job_id, organization_id, "all_platforms")
+        )
 
         engine = SyncEngine(db)
         result = engine.sync_all_platforms(organization_id)
@@ -67,6 +82,12 @@ async def sync_all_platforms_job(
             }
         }
 
+        # Emit job completed event
+        success = result.status in ["success", "partial"]
+        asyncio.create_task(
+            monitor.on_sync_completed(job_id, organization_id, result, success)
+        )
+
         logger.info(f"[JOB] Sync completed for {organization_id}: {result.status}")
         logger.info(f"[JOB] Results - Synced: {result.total_synced}, Failed: {result.total_failed}")
 
@@ -77,6 +98,18 @@ async def sync_all_platforms_job(
             f"[JOB] Error syncing all platforms for {organization_id}: {e}",
             exc_info=True
         )
+
+        # Emit error event
+        asyncio.create_task(
+            monitor.on_sync_error(
+                job_id,
+                organization_id,
+                str(e),
+                error_type="sync_job_exception",
+                severity="critical"
+            )
+        )
+
         return {
             "status": "failed",
             "error": str(e),
