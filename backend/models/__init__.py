@@ -41,6 +41,10 @@ from backend.models.ai_analysis import AIAnalysisResult
 from backend.models.sync_history import SyncHistory
 from backend.models.audit_log import AuditLog
 from backend.models.currency import Currency, ExchangeRate, ConversionHistory, CurrencyCode, RateSource
+from backend.models.tax import (
+    TaxType, TaxRate, TaxLiability, TaxAdjustment, TaxComplianceLog,
+    TaxTypeCode, TaxPeriod, TaxLiabilityStatus, TaxAdjustmentType
+)
 
 # Export all models for easy importing
 __all__ = [
@@ -59,4 +63,13 @@ __all__ = [
     "ConversionHistory",
     "CurrencyCode",
     "RateSource",
+    "TaxType",
+    "TaxRate",
+    "TaxLiability",
+    "TaxAdjustment",
+    "TaxComplianceLog",
+    "TaxTypeCode",
+    "TaxPeriod",
+    "TaxLiabilityStatus",
+    "TaxAdjustmentType",
 ]
