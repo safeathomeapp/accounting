@@ -1,0 +1,83 @@
+{
+  "compilerOptions": {
+    /**
+     * TypeScript Configuration for Accountancy Mobile App
+     *
+     * This file configures how TypeScript compiles our React Native code.
+     * Key settings:
+     * - target: ES2020 gives us modern JavaScript features
+     * - lib: dom and react-native give us types for browser and mobile
+     * - jsx: react-jsx enables JSX syntax in .tsx files
+     * - strict: true enforces strict type checking
+     * - module: esnext uses ES6 module syntax
+     */
+
+    // Compilation Target
+    "target": "ES2020",
+    "module": "esnext",
+
+    // Library Support
+    "lib": [
+      "ES2020",
+      "dom",
+      "dom.iterable"
+    ],
+
+    // JSX Configuration
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+
+    // Module Resolution
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowJs": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Strict Type Checking
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+
+    // Additional Checks
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Output
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+
+    // Path Aliases for easier imports
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@screens/*": ["./screens/*"],
+      "@components/*": ["./components/*"],
+      "@services/*": ["./services/*"],
+      "@stores/*": ["./stores/*"],
+      "@types/*": ["./types/*"],
+      "@utils/*": ["./utils/*"],
+      "@hooks/*": ["./hooks/*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".expo"
+  ]
+}
