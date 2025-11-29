@@ -31,7 +31,8 @@
       "Bash(curl:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
