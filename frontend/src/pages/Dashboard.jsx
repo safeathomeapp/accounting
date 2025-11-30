@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import Navigation from '../components/Navigation'
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const { user, logout } = useAuthStore()
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -12,7 +15,7 @@ export default function Dashboard() {
     const fetchSummary = async () => {
       try {
         const token = localStorage.getItem('authToken')
-        const response = await fetch('http://192.168.1.143:8000/api/v1/dashboard/summary', {
+        const response = await fetch('http://localhost:8000/api/v1/dashboard/overview', {
           headers: { Authorization: `Bearer ${token}` },
         })
 
@@ -49,7 +52,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     logout()
-    window.location.href = '/login'
+    navigate('/login')
   }
 
   if (loading) {
@@ -62,6 +65,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <Navigation />
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">

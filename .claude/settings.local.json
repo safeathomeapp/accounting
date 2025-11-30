@@ -32,7 +32,8 @@
       "Bash(npm run dev:*)",
       "Bash(npm run)",
       "Bash(git add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(pgrep:*)"
     ],
     "deny": [],
     "ask": []

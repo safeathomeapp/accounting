@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 
 export default function Login() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('test@example.com')
   const [password, setPassword] = useState('password')
   const { login, loading, error } = useAuthStore()
@@ -10,7 +12,7 @@ export default function Login() {
     e.preventDefault()
     const success = await login(email, password)
     if (success) {
-      window.location.href = '/dashboard'
+      navigate('/dashboard')
     }
   }
 
