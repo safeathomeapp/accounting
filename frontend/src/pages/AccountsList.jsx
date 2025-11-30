@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
+import { SkeletonGrid } from '../components/Skeleton'
 
 export default function AccountsList() {
   const navigate = useNavigate()
   const { logout } = useAuthStore()
+  const { addToast } = useToastStore()
   const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -102,23 +105,35 @@ export default function AccountsList() {
 
   const handleSync = async (accountId) => {
     try {
+      addToast('Starting sync...', 'info')
       const token = localStorage.getItem('authToken')
       const response = await fetch('http://localhost:8000/api/v1/sync/all', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
       if (response.ok) {
+        addToast('Sync completed successfully!', 'success')
         await fetchAccounts()
+      } else {
+        addToast('Sync failed', 'error')
       }
     } catch (err) {
-      console.error('Sync error:', err)
+      addToast('Sync error: ' + err.message, 'error')
     }
   }
 
-  if (loading) {
+  if (loading && accounts.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-xl text-gray-600">Loading accounts...</div>
+      <div className="min-h-screen bg-gray-100">
+        <Navigation />
+        <header className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <h1 className="text-3xl font-bold text-gray-900">Accounts</h1>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <SkeletonGrid />
+        </main>
       </div>
     )
   }

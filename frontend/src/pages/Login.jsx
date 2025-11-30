@@ -1,17 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { useToastStore } from '../stores/toastStore'
 
 export default function Login() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('test@example.com')
   const [password, setPassword] = useState('password')
   const { login, loading, error } = useAuthStore()
+  const { addToast } = useToastStore()
+
+  useEffect(() => {
+    if (error) {
+      addToast(error, 'error')
+    }
+  }, [error, addToast])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     const success = await login(email, password)
     if (success) {
+      addToast('Login successful!', 'success')
       navigate('/dashboard')
     }
   }
@@ -54,12 +63,6 @@ export default function Login() {
               disabled={loading}
             />
           </div>
-
-          {error && (
-            <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-              {error}
-            </div>
-          )}
 
           <button
             type="submit"

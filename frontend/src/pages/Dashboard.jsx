@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
+import { SkeletonGrid } from '../components/Skeleton'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  const { addToast } = useToastStore()
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -55,10 +58,19 @@ export default function Dashboard() {
     navigate('/login')
   }
 
-  if (loading) {
+  if (error && !summary) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-xl text-gray-600">Loading dashboard...</div>
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
+          <div className="text-red-600 text-5xl mb-4">⚠️</div>
+          <p className="text-gray-600">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
@@ -84,7 +96,8 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Stats Grid */}
+        {loading ? <SkeletonGrid /> : null}
+        {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Card 1 */}
           <div className="bg-white rounded-lg shadow p-6">
@@ -155,6 +168,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Last Sync Info */}
         {summary?.lastSync && (

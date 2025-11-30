@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
+import { SkeletonCard, SkeletonTable } from '../components/Skeleton'
 
 export default function SyncMonitor() {
   const navigate = useNavigate()
   const { logout } = useAuthStore()
+  const { addToast } = useToastStore()
   const [syncHistory, setSyncHistory] = useState([])
   const [syncStatus, setSyncStatus] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -143,6 +146,7 @@ export default function SyncMonitor() {
   const handleSync = async (platform) => {
     try {
       setSyncing(true)
+      addToast(platform === 'all' ? 'Starting full sync...' : `Syncing ${platform}...`, 'info')
       const token = localStorage.getItem('authToken')
       const endpoint =
         platform === 'all'
@@ -155,22 +159,34 @@ export default function SyncMonitor() {
       })
 
       if (response.ok) {
+        addToast('Sync completed successfully!', 'success')
         await fetchSyncData()
       } else {
-        setError('Sync failed. Please try again.')
+        addToast('Sync failed. Please try again.', 'error')
       }
     } catch (err) {
-      console.error('Sync error:', err)
-      setError('Error starting sync')
+      addToast('Error starting sync: ' + err.message, 'error')
     } finally {
       setSyncing(false)
     }
   }
 
-  if (loading) {
+  if (loading && !syncStatus) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-xl text-gray-600">Loading sync monitor...</div>
+      <div className="min-h-screen bg-gray-100">
+        <Navigation />
+        <header className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <h1 className="text-3xl font-bold text-gray-900">Sync Monitor</h1>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <SkeletonTable rows={5} />
+        </main>
       </div>
     )
   }

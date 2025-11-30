@@ -33,7 +33,8 @@
       "Bash(npm run)",
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(pgrep:*)"
+      "Bash(pgrep:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3NjQ2MjkxMDUsImlhdCI6MTc2NDU0MjcwNX0.gg-5bmMA7NsQPBH8suam_wAmryTsyQyMN5cYxYigwnc\")"
     ],
     "deny": [],
     "ask": []

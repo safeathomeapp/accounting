@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
+import { SkeletonTable } from '../components/Skeleton'
 
 export default function TransactionList() {
   const navigate = useNavigate()
   const { logout } = useAuthStore()
+  const { addToast } = useToastStore()
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -104,10 +107,18 @@ export default function TransactionList() {
     navigate('/login')
   }
 
-  if (loading) {
+  if (loading && transactions.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="text-xl text-gray-600">Loading transactions...</div>
+      <div className="min-h-screen bg-gray-100">
+        <Navigation />
+        <header className="bg-white shadow">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
+          </div>
+        </header>
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <SkeletonTable rows={5} />
+        </main>
       </div>
     )
   }
@@ -134,11 +145,6 @@ export default function TransactionList() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            {error}
-          </div>
-        )}
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
