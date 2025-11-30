@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
+import Pagination from '../components/Pagination'
 import { SkeletonCard, SkeletonTable } from '../components/Skeleton'
+
+const ITEMS_PER_PAGE = 10
 
 export default function SyncMonitor() {
   const navigate = useNavigate()
@@ -15,6 +18,7 @@ export default function SyncMonitor() {
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState(null)
   const [selectedPlatform, setSelectedPlatform] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchSyncData()
@@ -196,6 +200,18 @@ export default function SyncMonitor() {
       ? syncHistory
       : syncHistory.filter((s) => s.platform.toLowerCase() === selectedPlatform.toLowerCase())
 
+  const paginatedHistory = filteredHistory.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+
+  const handlePlatformChange = (platform) => {
+    setSelectedPlatform(platform)
+    setCurrentPage(1)
+  }
+
+  const handlePageChange = (page) => setCurrentPage(page)
+
   return (
     <div className="min-h-screen bg-gray-100">
       <Navigation />
@@ -342,7 +358,7 @@ export default function SyncMonitor() {
             <h2 className="text-lg font-semibold text-gray-900">Sync History</h2>
             <select
               value={selectedPlatform}
-              onChange={(e) => setSelectedPlatform(e.target.value)}
+              onChange={(e) => handlePlatformChange(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Platforms</option>
@@ -381,7 +397,7 @@ export default function SyncMonitor() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredHistory.map((sync) => (
+                  {paginatedHistory.map((sync) => (
                     <tr key={sync.sync_id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
                         {sync.platform}
@@ -423,6 +439,16 @@ export default function SyncMonitor() {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {/* Pagination */}
+          {filteredHistory.length > ITEMS_PER_PAGE && (
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredHistory.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={handlePageChange}
+            />
           )}
         </div>
       </main>

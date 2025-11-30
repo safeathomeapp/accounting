@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
+import Pagination from '../components/Pagination'
+import DateRangeFilter from '../components/DateRangeFilter'
 import { SkeletonTable } from '../components/Skeleton'
+import { exportToCSV } from '../utils/csvExport'
+
+const ITEMS_PER_PAGE = 10
 
 export default function TransactionList() {
   const navigate = useNavigate()
@@ -15,6 +20,9 @@ export default function TransactionList() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchTransactions()
@@ -99,12 +107,45 @@ export default function TransactionList() {
       t.merchant.toLowerCase().includes(search.toLowerCase())
     const matchesCategory = !categoryFilter || t.category === categoryFilter
     const matchesStatus = !statusFilter || t.status === statusFilter
-    return matchesSearch && matchesCategory && matchesStatus
+    const transactionDate = new Date(t.date)
+    const matchesStartDate = !startDate || transactionDate >= new Date(startDate)
+    const matchesEndDate = !endDate || transactionDate <= new Date(endDate)
+    return matchesSearch && matchesCategory && matchesStatus && matchesStartDate && matchesEndDate
   })
+
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+
+  const handleFilterChange = () => setCurrentPage(1)
+
+  const handlePageChange = (page) => setCurrentPage(page)
 
   const handleLogout = () => {
     logout()
     navigate('/login')
+  }
+
+  useEffect(() => {
+    handleFilterChange()
+  }, [search, categoryFilter, statusFilter, startDate, endDate])
+
+  const handleResetDates = () => {
+    setStartDate('')
+    setEndDate('')
+  }
+
+  const handleExport = () => {
+    exportToCSV(filteredTransactions, 'transactions', [
+      { key: 'date', label: 'Date' },
+      { key: 'description', label: 'Description' },
+      { key: 'merchant', label: 'Merchant' },
+      { key: 'category', label: 'Category' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'status', label: 'Status' },
+    ])
+    addToast('Transactions exported successfully!', 'success')
   }
 
   if (loading && transactions.length === 0) {
@@ -134,12 +175,21 @@ export default function TransactionList() {
             <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
             <p className="text-gray-600">View and manage all transactions</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
-          >
-            Logout
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={handleExport}
+              disabled={filteredTransactions.length === 0}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              📥 Export CSV
+            </button>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -202,6 +252,15 @@ export default function TransactionList() {
           </div>
         </div>
 
+        {/* Date Range Filter */}
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onStartChange={setStartDate}
+          onEndChange={setEndDate}
+          onReset={handleResetDates}
+        />
+
         {/* Transactions Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
           {filteredTransactions.length === 0 ? (
@@ -234,7 +293,7 @@ export default function TransactionList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredTransactions.map((transaction) => (
+                  {paginatedTransactions.map((transaction) => (
                     <tr key={transaction.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {new Date(transaction.date).toLocaleDateString()}
@@ -271,6 +330,16 @@ export default function TransactionList() {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {filteredTransactions.length > ITEMS_PER_PAGE && (
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredTransactions.length}
+            itemsPerPage={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+          />
+        )}
 
         {/* Summary */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
