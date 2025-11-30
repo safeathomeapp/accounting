@@ -5,8 +5,10 @@ import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
 import Pagination from '../components/Pagination'
 import DateRangeFilter from '../components/DateRangeFilter'
+import BulkActionsToolbar from '../components/BulkActionsToolbar'
 import { SkeletonTable } from '../components/Skeleton'
 import { exportToCSV } from '../utils/csvExport'
+import { useBulkSelection } from '../hooks/useBulkSelection'
 
 const ITEMS_PER_PAGE = 10
 
@@ -16,6 +18,7 @@ export default function TransactionList() {
   const { addToast } = useToastStore()
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [bulkLoading, setBulkLoading] = useState(false)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -23,6 +26,7 @@ export default function TransactionList() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const bulk = useBulkSelection(transactions)
 
   useEffect(() => {
     fetchTransactions()
@@ -148,6 +152,47 @@ export default function TransactionList() {
     addToast('Transactions exported successfully!', 'success')
   }
 
+  const handleBulkCategorize = async (category) => {
+    setBulkLoading(true)
+    try {
+      const selected = bulk.getSelectedItems()
+      setTransactions((prev) =>
+        prev.map((t) => (selected.find((s) => s.id === t.id) ? { ...t, category } : t))
+      )
+      bulk.deselectAll()
+      addToast(`${selected.length} transactions categorized as ${category}`, 'success')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const handleBulkStatusChange = async (status) => {
+    setBulkLoading(true)
+    try {
+      const selected = bulk.getSelectedItems()
+      setTransactions((prev) =>
+        prev.map((t) => (selected.find((s) => s.id === t.id) ? { ...t, status } : t))
+      )
+      bulk.deselectAll()
+      addToast(`${selected.length} transactions status updated to ${status}`, 'success')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Delete ${bulk.count} transactions?`)) return
+    setBulkLoading(true)
+    try {
+      const selected = bulk.getSelectedItems()
+      setTransactions((prev) => prev.filter((t) => !selected.find((s) => s.id === t.id)))
+      bulk.deselectAll()
+      addToast(`${selected.length} transactions deleted`, 'success')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   if (loading && transactions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-100">
@@ -192,6 +237,21 @@ export default function TransactionList() {
           </div>
         </div>
       </header>
+
+      {/* Bulk Actions Toolbar */}
+      {bulk.hasSelection && (
+        <BulkActionsToolbar
+          count={bulk.count}
+          totalCount={transactions.length}
+          isAllSelected={bulk.isAllSelected}
+          onSelectAll={bulk.selectAll}
+          onDeselectAll={bulk.deselectAll}
+          onCategorize={handleBulkCategorize}
+          onChangeStatus={handleBulkStatusChange}
+          onDelete={handleBulkDelete}
+          loading={bulkLoading}
+        />
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
@@ -272,6 +332,14 @@ export default function TransactionList() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={bulk.isAllSelected}
+                        onChange={(e) => (e.target.checked ? bulk.selectAll() : bulk.deselectAll())}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
                       Date
                     </th>
@@ -294,7 +362,15 @@ export default function TransactionList() {
                 </thead>
                 <tbody className="divide-y">
                   {paginatedTransactions.map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50">
+                    <tr key={transaction.id} className={`hover:bg-gray-50 ${bulk.isItemSelected(transaction.id) ? 'bg-blue-50' : ''}`}>
+                      <td className="px-4 py-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={bulk.isItemSelected(transaction.id)}
+                          onChange={() => bulk.toggleItem(transaction.id)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {new Date(transaction.date).toLocaleDateString()}
                       </td>
