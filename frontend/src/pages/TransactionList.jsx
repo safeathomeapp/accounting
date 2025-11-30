@@ -9,6 +9,7 @@ import BulkActionsToolbar from '../components/BulkActionsToolbar'
 import { SkeletonTable } from '../components/Skeleton'
 import { exportToCSV } from '../utils/csvExport'
 import { useBulkSelection } from '../hooks/useBulkSelection'
+import { useSortedItems } from '../hooks/useSortedItems'
 
 const ITEMS_PER_PAGE = 10
 
@@ -117,7 +118,10 @@ export default function TransactionList() {
     return matchesSearch && matchesCategory && matchesStatus && matchesStartDate && matchesEndDate
   })
 
-  const paginatedTransactions = filteredTransactions.slice(
+  const sort = useSortedItems(filteredTransactions)
+  const sortedTransactions = sort.getSorted()
+
+  const paginatedTransactions = sortedTransactions.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   )
@@ -210,15 +214,15 @@ export default function TransactionList() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 dark:text-white">
       <Navigation />
 
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
-            <p className="text-gray-600">View and manage all transactions</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Transactions</h1>
+            <p className="text-gray-600 dark:text-gray-300">View and manage all transactions</p>
           </div>
           <div className="flex gap-4">
             <button
@@ -340,23 +344,41 @@ export default function TransactionList() {
                         className="w-4 h-4 cursor-pointer"
                       />
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Date
+                    <th
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => sort.toggleSort('date')}
+                    >
+                      Date {sort.getSortIndicator('date')}
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Description
+                    <th
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => sort.toggleSort('description')}
+                    >
+                      Description {sort.getSortIndicator('description')}
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Merchant
+                    <th
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => sort.toggleSort('merchant')}
+                    >
+                      Merchant {sort.getSortIndicator('merchant')}
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Category
+                    <th
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => sort.toggleSort('category')}
+                    >
+                      Category {sort.getSortIndicator('category')}
                     </th>
-                    <th className="px-6 py-3 text-right text-sm font-medium text-gray-700">
-                      Amount
+                    <th
+                      className="px-6 py-3 text-right text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => sort.toggleSort('amount')}
+                    >
+                      Amount {sort.getSortIndicator('amount')}
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
-                      Status
+                    <th
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => sort.toggleSort('status')}
+                    >
+                      Status {sort.getSortIndicator('status')}
                     </th>
                   </tr>
                 </thead>

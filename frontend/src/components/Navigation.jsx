@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import DarkModeToggle from './DarkModeToggle'
 
 export default function Navigation() {
   const location = useLocation()
@@ -6,7 +7,7 @@ export default function Navigation() {
   const isActive = (path) => location.pathname === path
 
   return (
-    <nav className="bg-gray-800 text-white shadow-lg">
+    <nav className="bg-gray-800 dark:bg-gray-900 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -17,7 +18,7 @@ export default function Navigation() {
             <span className="font-bold text-lg">Accountancy</span>
           </Link>
 
-          {/* Menu */}
+          {/* Menu & Toggle */}
           <div className="flex items-center space-x-1">
             <Link
               to="/dashboard"
@@ -59,6 +60,7 @@ export default function Navigation() {
             >
               Sync Monitor
             </Link>
+            <DarkModeToggle />
           </div>
         </div>
       </div>

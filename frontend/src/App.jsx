@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
+import { useThemeStore } from './stores/themeStore'
 import ErrorBoundary from './components/ErrorBoundary'
 import Toast from './components/Toast'
 import Login from './pages/Login'
@@ -16,12 +17,14 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   const { isAuthenticated, checkAuth } = useAuthStore()
+  const { initTheme } = useThemeStore()
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    initTheme()
     checkAuth()
     setReady(true)
-  }, [checkAuth])
+  }, [checkAuth, initTheme])
 
   if (!ready) {
     return (
