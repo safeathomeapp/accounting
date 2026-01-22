@@ -24,9 +24,7 @@ python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 - Login with: `test@example.com` (any password)
 - Verify JWT token is created and stored
 
-### 3. **Complete Frontend Phase 3** (Current Priority)
-
-According to `START_HERE_MONTH6_PHASE3.md`, these are pending:
+### 3. **Complete Frontend Phase 3** (Current priority is testing carried out works)
 
 **Immediate Tasks:**
 - [ ] Connect Dashboard to real API data
@@ -160,11 +158,7 @@ export default function TransactionList() {
 
 ## 🚀 ROADMAP TO LAUNCH
 
-### Phase 3 Completion (This Week)
-1. Complete web frontend core pages
-2. Connect all pages to real API
-3. Test end-to-end workflows
-4. Fix any integration issues
+### Integration of other accounting softwares such as Freagent, Clearbooks and Freshbooks and Sage cloud
 
 ### Phase 4: Polish & Deploy (Next Week)
 1. Add loading states and error handling
@@ -182,22 +176,13 @@ export default function TransactionList() {
 
 ## ⚠️ IMPORTANT NOTES
 
-### Documentation Status
-There are multiple conflicting status documents:
-- `PROJECT_STATUS.md` - Says Month 6 Phase 1
-- `START_HERE_MONTH_6_PHASE_2.md` - Says Phase 2
-- `START_HERE_MONTH6_PHASE3.md` - Current (Phase 3)
 
-**Use START_HERE_MONTH6_PHASE3.md as source of truth**
 
 ### Mobile App Status
 The React Native mobile app was archived due to SDK conflicts:
 - Location: `mobile-app-archived/`
 - Decision: Focus on responsive web app
 - Can revisit in future if needed
-
-### Test Coverage
-While docs show different test counts (353 vs 903), the actual count is 903 based on PROJECT_STATUS.md accumulation.
 
 ---
 
@@ -237,16 +222,6 @@ While docs show different test counts (353 vs 903), the actual count is 903 base
 ### API Connection Issues
 - Verify backend is running on `http://192.168.1.143:8000`
 - Check `frontend/src/services/api.js` for correct base URL
-
----
-
-## 📚 KEY FILES TO REVIEW
-
-1. **Current Status:** `/START_HERE_MONTH6_PHASE3.md`
-2. **Frontend Setup:** `/docs/FRONTEND_SETUP.md`
-3. **Session Notes:** `/docs/SESSION_NOTES/MONTH6_PHASE3.md`
-4. **Backend Main:** `/backend/main.py`
-5. **Auth Routes:** `/backend/api/auth_routes.py`
 
 ---
 

@@ -199,11 +199,11 @@ export default function TransactionList() {
 
   if (loading && transactions.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
         <Navigation />
-        <header className="bg-white shadow">
+        <header className="bg-white dark:bg-gray-800 shadow">
           <div className="max-w-7xl mx-auto px-4 py-6">
-            <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Transactions</h1>
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-4 py-8">
@@ -261,12 +261,12 @@ export default function TransactionList() {
       <main className="max-w-7xl mx-auto px-4 py-8">
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Filters</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Search */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Search by description or merchant
               </label>
               <input
@@ -274,19 +274,19 @@ export default function TransactionList() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
 
             {/* Category Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Category
               </label>
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="">All Categories</option>
                 <option value="Office Expenses">Office Expenses</option>
@@ -299,13 +299,13 @@ export default function TransactionList() {
 
             {/* Status Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Status
               </label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="">All Statuses</option>
                 <option value="Categorized">Categorized</option>
@@ -326,15 +326,15 @@ export default function TransactionList() {
         />
 
         {/* Transactions Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
           {filteredTransactions.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
               No transactions found
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600">
                   <tr>
                     <th className="px-4 py-3 text-left">
                       <input
@@ -345,46 +345,46 @@ export default function TransactionList() {
                       />
                     </th>
                     <th
-                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                       onClick={() => sort.toggleSort('date')}
                     >
                       Date {sort.getSortIndicator('date')}
                     </th>
                     <th
-                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                       onClick={() => sort.toggleSort('description')}
                     >
                       Description {sort.getSortIndicator('description')}
                     </th>
                     <th
-                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                       onClick={() => sort.toggleSort('merchant')}
                     >
                       Merchant {sort.getSortIndicator('merchant')}
                     </th>
                     <th
-                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                       onClick={() => sort.toggleSort('category')}
                     >
                       Category {sort.getSortIndicator('category')}
                     </th>
                     <th
-                      className="px-6 py-3 text-right text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-6 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                       onClick={() => sort.toggleSort('amount')}
                     >
                       Amount {sort.getSortIndicator('amount')}
                     </th>
                     <th
-                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                       onClick={() => sort.toggleSort('status')}
                     >
                       Status {sort.getSortIndicator('status')}
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y dark:divide-gray-700">
                   {paginatedTransactions.map((transaction) => (
-                    <tr key={transaction.id} className={`hover:bg-gray-50 ${bulk.isItemSelected(transaction.id) ? 'bg-blue-50' : ''}`}>
+                    <tr key={transaction.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${bulk.isItemSelected(transaction.id) ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
                       <td className="px-4 py-4 text-center">
                         <input
                           type="checkbox"
@@ -393,29 +393,29 @@ export default function TransactionList() {
                           className="w-4 h-4 cursor-pointer"
                         />
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {new Date(transaction.date).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                         {transaction.description}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {transaction.merchant}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {transaction.category}
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium text-right text-gray-900">
+                      <td className="px-6 py-4 text-sm font-medium text-right text-gray-900 dark:text-white">
                         £{transaction.amount.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-semibold ${
                             transaction.status === 'Categorized'
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
                               : transaction.status === 'Needs Review'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                           }`}
                         >
                           {transaction.status}
@@ -441,21 +441,21 @@ export default function TransactionList() {
 
         {/* Summary */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-500 text-sm font-medium">Total Transactions</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Transactions</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
               {filteredTransactions.length}
             </p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-500 text-sm font-medium">Total Amount</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Amount</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
               £{filteredTransactions.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
             </p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-500 text-sm font-medium">Categorized</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Categorized</p>
+            <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">
               {filteredTransactions.filter((t) => t.status === 'Categorized').length}
             </p>
           </div>

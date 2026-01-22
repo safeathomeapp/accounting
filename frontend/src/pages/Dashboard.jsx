@@ -60,10 +60,10 @@ export default function Dashboard() {
 
   if (error && !summary) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-md">
           <div className="text-red-600 text-5xl mb-4">⚠️</div>
-          <p className="text-gray-600">{error}</p>
+          <p className="text-gray-600 dark:text-gray-300">{error}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
@@ -76,14 +76,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navigation />
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600">Welcome back!</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+            <p className="text-gray-600 dark:text-gray-400">Welcome back!</p>
           </div>
           <button
             onClick={handleLogout}
@@ -100,16 +100,16 @@ export default function Dashboard() {
         {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Card 1 */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium">Total Accounts</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Accounts</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
                   {summary?.totalAccounts || 0}
                 </p>
               </div>
-              <div className="bg-blue-100 p-3 rounded-lg">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
+                <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                 </svg>
               </div>
@@ -117,16 +117,16 @@ export default function Dashboard() {
           </div>
 
           {/* Card 2 */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium">Transactions</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Transactions</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
                   {summary?.totalTransactions?.toLocaleString() || 0}
                 </p>
               </div>
-              <div className="bg-green-100 p-3 rounded-lg">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
+                <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
@@ -134,16 +134,16 @@ export default function Dashboard() {
           </div>
 
           {/* Card 3 */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium">Revenue</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Revenue</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
                   {summary?.revenue || '$0'}
                 </p>
               </div>
-              <div className="bg-emerald-100 p-3 rounded-lg">
-                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-emerald-100 dark:bg-emerald-900 p-3 rounded-lg">
+                <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -151,17 +151,17 @@ export default function Dashboard() {
           </div>
 
           {/* Card 4 */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-500 text-sm font-medium">Sync Status</p>
-                <p className="text-lg font-bold text-green-600 mt-1 flex items-center">
-                  <span className="w-2 h-2 bg-green-600 rounded-full mr-2"></span>
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Sync Status</p>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400 mt-1 flex items-center">
+                  <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full mr-2"></span>
                   {summary?.syncStatus || 'Idle'}
                 </p>
               </div>
-              <div className="bg-purple-100 p-3 rounded-lg">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
+                <svg className="w-8 h-8 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </div>
@@ -172,9 +172,9 @@ export default function Dashboard() {
 
         {/* Last Sync Info */}
         {summary?.lastSync && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Last Sync</h2>
-            <p className="text-gray-600">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Last Sync</h2>
+            <p className="text-gray-600 dark:text-gray-400">
               {new Date(summary.lastSync).toLocaleString()}
             </p>
           </div>

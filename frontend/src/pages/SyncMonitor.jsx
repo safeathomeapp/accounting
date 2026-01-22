@@ -177,11 +177,11 @@ export default function SyncMonitor() {
 
   if (loading && !syncStatus) {
     return (
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
         <Navigation />
-        <header className="bg-white shadow">
+        <header className="bg-white dark:bg-gray-800 shadow">
           <div className="max-w-7xl mx-auto px-4 py-6">
-            <h1 className="text-3xl font-bold text-gray-900">Sync Monitor</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Sync Monitor</h1>
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-4 py-8">
@@ -213,15 +213,15 @@ export default function SyncMonitor() {
   const handlePageChange = (page) => setCurrentPage(page)
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navigation />
 
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Sync Monitor</h1>
-            <p className="text-gray-600">Real-time sync status and history</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Sync Monitor</h1>
+            <p className="text-gray-600 dark:text-gray-400">Real-time sync status and history</p>
           </div>
           <button
             onClick={handleLogout}
@@ -244,19 +244,19 @@ export default function SyncMonitor() {
         {syncStatus && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {Object.entries(syncStatus.platforms).map(([key, platform]) => (
-              <div key={key} className="bg-white rounded-lg shadow p-6">
+              <div key={key} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                       {platform.platform_name}
                     </h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       Status:{' '}
                       <span
                         className={`font-semibold ${
                           platform.is_active
-                            ? 'text-green-600'
-                            : 'text-gray-600'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-gray-600 dark:text-gray-400'
                         }`}
                       >
                         {platform.is_active ? 'Active' : 'Inactive'}
@@ -268,7 +268,7 @@ export default function SyncMonitor() {
                     disabled={syncing || !platform.is_active}
                     className={`px-4 py-2 rounded font-semibold transition ${
                       syncing || !platform.is_active
-                        ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                        ? 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
@@ -278,47 +278,47 @@ export default function SyncMonitor() {
 
                 {platform.last_sync_at && (
                   <>
-                    <div className="space-y-3 mb-4 pb-4 border-b border-gray-200">
+                    <div className="space-y-3 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Last Sync:</span>
-                        <span className="text-gray-900">
+                        <span className="text-gray-600 dark:text-gray-400">Last Sync:</span>
+                        <span className="text-gray-900 dark:text-white">
                           {new Date(platform.last_sync_at).toLocaleString()}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Duration:</span>
-                        <span className="text-gray-900">{platform.duration_seconds}s</span>
+                        <span className="text-gray-600 dark:text-gray-400">Duration:</span>
+                        <span className="text-gray-900 dark:text-white">{platform.duration_seconds}s</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Sync Type:</span>
-                        <span className="text-gray-900">{platform.sync_type}</span>
+                        <span className="text-gray-600 dark:text-gray-400">Sync Type:</span>
+                        <span className="text-gray-900 dark:text-white">{platform.sync_type}</span>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-4 gap-2">
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-blue-600">
+                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                           {platform.records_synced}
                         </p>
-                        <p className="text-xs text-gray-600">Synced</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Synced</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-green-600">
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {platform.records_created}
                         </p>
-                        <p className="text-xs text-gray-600">Created</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Created</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-yellow-600">
+                        <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
                           {platform.records_updated}
                         </p>
-                        <p className="text-xs text-gray-600">Updated</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Updated</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-red-600">
+                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                           {platform.records_failed}
                         </p>
-                        <p className="text-xs text-gray-600">Failed</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Failed</p>
                       </div>
                     </div>
                   </>
@@ -329,15 +329,15 @@ export default function SyncMonitor() {
         )}
 
         {/* Sync Actions */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               onClick={() => handleSync('all')}
               disabled={syncing}
               className={`px-6 py-3 rounded-lg font-semibold transition ${
                 syncing
-                  ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                  ? 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
             >
@@ -353,13 +353,13 @@ export default function SyncMonitor() {
         </div>
 
         {/* Sync History */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Sync History</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Sync History</h2>
             <select
               value={selectedPlatform}
               onChange={(e) => handlePlatformChange(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="all">All Platforms</option>
               <option value="xero">Xero</option>
@@ -368,68 +368,68 @@ export default function SyncMonitor() {
           </div>
 
           {filteredHistory.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               No sync history found
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600">
                   <tr>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
                       Platform
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
                       Type
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
                       Started
                     </th>
-                    <th className="px-6 py-3 text-right text-sm font-medium text-gray-700">
+                    <th className="px-6 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300">
                       Duration
                     </th>
-                    <th className="px-6 py-3 text-right text-sm font-medium text-gray-700">
+                    <th className="px-6 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300">
                       Records
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y dark:divide-gray-700">
                   {paginatedHistory.map((sync) => (
-                    <tr key={sync.sync_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                    <tr key={sync.sync_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                         {sync.platform}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {sync.sync_type}
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-semibold ${
                             sync.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
                               : sync.status === 'in_progress'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-red-100 text-red-800'
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
                           }`}
                         >
                           {sync.status.charAt(0).toUpperCase() + sync.status.slice(1)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {new Date(sync.started_at).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-600">
+                      <td className="px-6 py-4 text-sm text-right text-gray-600 dark:text-gray-400">
                         {sync.duration_seconds}s
                       </td>
                       <td className="px-6 py-4 text-sm text-right">
-                        <span className="text-gray-900">
+                        <span className="text-gray-900 dark:text-white">
                           {sync.records.synced} synced
                         </span>
                         {sync.records.failed > 0 && (
-                          <span className="ml-2 text-red-600">
+                          <span className="ml-2 text-red-600 dark:text-red-400">
                             ({sync.records.failed} failed)
                           </span>
                         )}
