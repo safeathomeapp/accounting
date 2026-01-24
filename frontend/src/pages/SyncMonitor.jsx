@@ -1,3 +1,13 @@
+/**
+ * Sync Monitor Page
+ *
+ * Displays sync status and history for platform integrations.
+ * Shows real-time status from the backend API.
+ *
+ * @author Claude Code
+ * @updated January 24, 2026
+ */
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
@@ -5,6 +15,7 @@ import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
 import Pagination from '../components/Pagination'
 import { SkeletonCard, SkeletonTable } from '../components/Skeleton'
+import api from '../services/api'
 
 const ITEMS_PER_PAGE = 10
 
@@ -30,117 +41,29 @@ export default function SyncMonitor() {
   const fetchSyncData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('authToken')
+      setError(null)
 
       // Fetch sync status
-      const statusResponse = await fetch('http://localhost:8000/api/v1/sync/status', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const statusResponse = await api.get('/sync/status')
+      setSyncStatus(statusResponse.data)
 
       // Fetch sync history
-      const historyResponse = await fetch('http://localhost:8000/api/v1/sync/history?limit=20', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (statusResponse.ok) {
-        setSyncStatus(await statusResponse.json())
-      } else {
-        setSyncStatus(generateMockStatus())
-      }
-
-      if (historyResponse.ok) {
-        const data = await historyResponse.json()
-        setSyncHistory(data.syncs || generateMockHistory())
-      } else {
-        setSyncHistory(generateMockHistory())
-      }
-
-      setError(null)
+      const historyResponse = await api.get('/sync/history', { params: { limit: 20 } })
+      setSyncHistory(historyResponse.data.syncs || [])
     } catch (err) {
       console.error('Error fetching sync data:', err)
-      setSyncStatus(generateMockStatus())
-      setSyncHistory(generateMockHistory())
+      if (err.response?.status === 404) {
+        // No sync configured yet - show empty state
+        setSyncStatus({ platforms: {} })
+        setSyncHistory([])
+      } else {
+        setError(err.response?.data?.detail || 'Failed to load sync data')
+        addToast('Failed to load sync data', 'error')
+      }
     } finally {
       setLoading(false)
     }
   }
-
-  const generateMockStatus = () => ({
-    organization_id: '123',
-    platforms: {
-      xero: {
-        platform_name: 'Xero',
-        is_active: true,
-        last_sync_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        sync_type: 'Full',
-        records_synced: 1250,
-        records_created: 45,
-        records_updated: 120,
-        records_failed: 2,
-        duration_seconds: 45,
-      },
-      quickbooks: {
-        platform_name: 'QuickBooks',
-        is_active: false,
-        last_sync_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        sync_type: 'Incremental',
-        records_synced: 320,
-        records_created: 10,
-        records_updated: 30,
-        records_failed: 0,
-        duration_seconds: 23,
-      },
-    },
-  })
-
-  const generateMockHistory = () => [
-    {
-      sync_id: '1',
-      platform: 'Xero',
-      sync_type: 'Full',
-      status: 'completed',
-      started_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      completed_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 45 * 1000).toISOString(),
-      duration_seconds: 45,
-      records: {
-        synced: 1250,
-        created: 45,
-        updated: 120,
-        failed: 2,
-      },
-    },
-    {
-      sync_id: '2',
-      platform: 'Xero',
-      sync_type: 'Incremental',
-      status: 'completed',
-      started_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-      completed_at: new Date(Date.now() - 6 * 60 * 60 * 1000 + 30 * 1000).toISOString(),
-      duration_seconds: 30,
-      records: {
-        synced: 45,
-        created: 12,
-        updated: 20,
-        failed: 0,
-      },
-    },
-    {
-      sync_id: '3',
-      platform: 'QuickBooks',
-      sync_type: 'Full',
-      status: 'failed',
-      started_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      completed_at: new Date(Date.now() - 24 * 60 * 60 * 1000 + 120 * 1000).toISOString(),
-      duration_seconds: 120,
-      records: {
-        synced: 320,
-        created: 10,
-        updated: 30,
-        failed: 5,
-      },
-      error_message: 'Authentication token expired',
-    },
-  ]
 
   const handleLogout = () => {
     logout()
@@ -151,25 +74,14 @@ export default function SyncMonitor() {
     try {
       setSyncing(true)
       addToast(platform === 'all' ? 'Starting full sync...' : `Syncing ${platform}...`, 'info')
-      const token = localStorage.getItem('authToken')
-      const endpoint =
-        platform === 'all'
-          ? 'http://localhost:8000/api/v1/sync/all'
-          : `http://localhost:8000/api/v1/sync/platform/${platform}`
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const endpoint = platform === 'all' ? '/sync/all' : `/sync/platform/${platform}`
+      await api.post(endpoint)
 
-      if (response.ok) {
-        addToast('Sync completed successfully!', 'success')
-        await fetchSyncData()
-      } else {
-        addToast('Sync failed. Please try again.', 'error')
-      }
+      addToast('Sync completed successfully!', 'success')
+      await fetchSyncData()
     } catch (err) {
-      addToast('Error starting sync: ' + err.message, 'error')
+      addToast(err.response?.data?.detail || 'Sync failed. Please try again.', 'error')
     } finally {
       setSyncing(false)
     }
@@ -198,7 +110,7 @@ export default function SyncMonitor() {
   const filteredHistory =
     selectedPlatform === 'all'
       ? syncHistory
-      : syncHistory.filter((s) => s.platform.toLowerCase() === selectedPlatform.toLowerCase())
+      : syncHistory.filter((s) => s.platform?.toLowerCase() === selectedPlatform.toLowerCase())
 
   const paginatedHistory = filteredHistory.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -212,6 +124,8 @@ export default function SyncMonitor() {
 
   const handlePageChange = (page) => setCurrentPage(page)
 
+  const hasPlatforms = syncStatus && Object.keys(syncStatus.platforms || {}).length > 0
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Navigation />
@@ -221,7 +135,7 @@ export default function SyncMonitor() {
         <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Sync Monitor</h1>
-            <p className="text-gray-600 dark:text-gray-400">Real-time sync status and history</p>
+            <p className="text-gray-600 dark:text-gray-400">Platform sync status and history</p>
           </div>
           <button
             onClick={handleLogout}
@@ -240,8 +154,24 @@ export default function SyncMonitor() {
           </div>
         )}
 
+        {/* No Platforms Connected */}
+        {!hasPlatforms && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center mb-8">
+            <div className="text-gray-400 text-6xl mb-4">!</div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              No Platforms Connected
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Connect Xero or QuickBooks to start syncing your accounting data.
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Currently using local PostgreSQL database with seeded test data.
+            </p>
+          </div>
+        )}
+
         {/* Sync Status Cards */}
-        {syncStatus && (
+        {hasPlatforms && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {Object.entries(syncStatus.platforms).map(([key, platform]) => (
               <div key={key} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -287,7 +217,9 @@ export default function SyncMonitor() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Duration:</span>
-                        <span className="text-gray-900 dark:text-white">{platform.duration_seconds}s</span>
+                        <span className="text-gray-900 dark:text-white">
+                          {platform.duration_seconds}s
+                        </span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Sync Type:</span>
@@ -298,25 +230,25 @@ export default function SyncMonitor() {
                     <div className="grid grid-cols-4 gap-2">
                       <div className="text-center">
                         <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                          {platform.records_synced}
+                          {platform.records_synced || 0}
                         </p>
                         <p className="text-xs text-gray-600 dark:text-gray-400">Synced</p>
                       </div>
                       <div className="text-center">
                         <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                          {platform.records_created}
+                          {platform.records_created || 0}
                         </p>
                         <p className="text-xs text-gray-600 dark:text-gray-400">Created</p>
                       </div>
                       <div className="text-center">
                         <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                          {platform.records_updated}
+                          {platform.records_updated || 0}
                         </p>
                         <p className="text-xs text-gray-600 dark:text-gray-400">Updated</p>
                       </div>
                       <div className="text-center">
                         <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                          {platform.records_failed}
+                          {platform.records_failed || 0}
                         </p>
                         <p className="text-xs text-gray-600 dark:text-gray-400">Failed</p>
                       </div>
@@ -328,15 +260,30 @@ export default function SyncMonitor() {
           </div>
         )}
 
-        {/* Sync Actions */}
+        {/* Database Status Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Database Status
+          </h2>
+          <div className="flex items-center">
+            <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
+            <span className="text-gray-900 dark:text-white font-medium">PostgreSQL Connected</span>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Using local database with seeded test data. Connect Xero or QuickBooks to sync live
+            accounting data.
+          </p>
+        </div>
+
+        {/* Quick Actions */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               onClick={() => handleSync('all')}
-              disabled={syncing}
+              disabled={syncing || !hasPlatforms}
               className={`px-6 py-3 rounded-lg font-semibold transition ${
-                syncing
+                syncing || !hasPlatforms
                   ? 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                   : 'bg-green-600 text-white hover:bg-green-700'
               }`}
@@ -369,7 +316,7 @@ export default function SyncMonitor() {
 
           {filteredHistory.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              No sync history found
+              No sync history available. Connect a platform to start syncing.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -426,9 +373,9 @@ export default function SyncMonitor() {
                       </td>
                       <td className="px-6 py-4 text-sm text-right">
                         <span className="text-gray-900 dark:text-white">
-                          {sync.records.synced} synced
+                          {sync.records?.synced || 0} synced
                         </span>
-                        {sync.records.failed > 0 && (
+                        {sync.records?.failed > 0 && (
                           <span className="ml-2 text-red-600 dark:text-red-400">
                             ({sync.records.failed} failed)
                           </span>

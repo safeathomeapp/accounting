@@ -1,7 +1,17 @@
+/**
+ * Accounts List Page
+ *
+ * Displays chart of accounts from PostgreSQL database with filtering.
+ *
+ * @author Claude Code
+ * @updated January 24, 2026
+ */
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
+import { accountsAPI, clientsAPI } from '../services/api'
 import Navigation from '../components/Navigation'
 import { SkeletonGrid } from '../components/Skeleton'
 
@@ -10,92 +20,51 @@ export default function AccountsList() {
   const { logout } = useAuthStore()
   const { addToast } = useToastStore()
   const [accounts, setAccounts] = useState([])
+  const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
-  const [platformFilter, setPlatformFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [activeTab, setActiveTab] = useState('accounts')
 
   useEffect(() => {
-    fetchAccounts()
+    fetchData()
   }, [])
 
-  const fetchAccounts = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('authToken')
-      const response = await fetch('http://localhost:8000/api/v1/sync/status', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        // Use mock data for demo
-        setAccounts(generateMockAccounts())
-      } else {
-        const data = await response.json()
-        setAccounts(data.accounts || generateMockAccounts())
-      }
       setError(null)
+
+      const [accountsRes, clientsRes] = await Promise.all([
+        accountsAPI.list({ limit: 100 }),
+        clientsAPI.list({ limit: 100 }),
+      ])
+
+      setAccounts(accountsRes.data.accounts || [])
+      setClients(clientsRes.data.clients || [])
     } catch (err) {
-      console.error('Error fetching accounts:', err)
-      // Use mock data on error
-      setAccounts(generateMockAccounts())
+      console.error('Error fetching data:', err)
+      setError(err.response?.data?.detail || 'Failed to load data')
+      addToast('Failed to load data', 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  const generateMockAccounts = () => [
-    {
-      id: '1',
-      name: 'Business Bank Account',
-      platform: 'Xero',
-      code: 'BANK-001',
-      type: 'Bank',
-      balance: 25430.50,
-      currency: 'GBP',
-      active: true,
-      lastSync: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '2',
-      name: 'Savings Account',
-      platform: 'Xero',
-      code: 'SAV-001',
-      type: 'Savings',
-      balance: 10000.00,
-      currency: 'GBP',
-      active: true,
-      lastSync: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '3',
-      name: 'Client Receivables',
-      platform: 'QuickBooks',
-      code: 'AR-001',
-      type: 'Receivable',
-      balance: 5230.75,
-      currency: 'GBP',
-      active: true,
-      lastSync: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '4',
-      name: 'Tax Payable',
-      platform: 'Xero',
-      code: 'TAX-001',
-      type: 'Payable',
-      balance: -3500.00,
-      currency: 'GBP',
-      active: true,
-      lastSync: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    },
-  ]
-
   const filteredAccounts = accounts.filter((a) => {
-    const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch =
+      a.name.toLowerCase().includes(search.toLowerCase()) ||
       a.code.toLowerCase().includes(search.toLowerCase())
-    const matchesPlatform = !platformFilter || a.platform === platformFilter
-    return matchesSearch && matchesPlatform
+    const matchesType = !typeFilter || a.account_type === typeFilter
+    return matchesSearch && matchesType
+  })
+
+  const filteredClients = clients.filter((c) => {
+    const matchesSearch =
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      (c.email && c.email.toLowerCase().includes(search.toLowerCase()))
+    return matchesSearch
   })
 
   const handleLogout = () => {
@@ -103,23 +72,30 @@ export default function AccountsList() {
     navigate('/login')
   }
 
-  const handleSync = async (accountId) => {
-    try {
-      addToast('Starting sync...', 'info')
-      const token = localStorage.getItem('authToken')
-      const response = await fetch('http://localhost:8000/api/v1/sync/all', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (response.ok) {
-        addToast('Sync completed successfully!', 'success')
-        await fetchAccounts()
-      } else {
-        addToast('Sync failed', 'error')
-      }
-    } catch (err) {
-      addToast('Sync error: ' + err.message, 'error')
-    }
+  // Get unique account types for filter dropdown
+  const accountTypes = [...new Set(accounts.map((a) => a.account_type).filter(Boolean))]
+
+  if (error && accounts.length === 0 && clients.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <Navigation />
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-md text-center">
+            <div className="text-red-600 text-5xl mb-4">!</div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Unable to Load Data
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
+            <button
+              onClick={fetchData}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (loading && accounts.length === 0) {
@@ -128,7 +104,7 @@ export default function AccountsList() {
         <Navigation />
         <header className="bg-white dark:bg-gray-800 shadow">
           <div className="max-w-7xl mx-auto px-4 py-6">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Accounts</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Accounts & Clients</h1>
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-4 py-8">
@@ -147,7 +123,9 @@ export default function AccountsList() {
         <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Accounts & Clients</h1>
-            <p className="text-gray-600 dark:text-gray-400">View all connected accounts and client information</p>
+            <p className="text-gray-600 dark:text-gray-400">
+              {accounts.length} accounts, {clients.length} clients
+            </p>
           </div>
           <button
             onClick={handleLogout}
@@ -160,11 +138,29 @@ export default function AccountsList() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            {error}
-          </div>
-        )}
+        {/* Tab Navigation */}
+        <div className="flex space-x-4 mb-6">
+          <button
+            onClick={() => setActiveTab('accounts')}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              activeTab === 'accounts'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          >
+            Chart of Accounts ({accounts.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('clients')}
+            className={`px-4 py-2 rounded-lg font-medium transition ${
+              activeTab === 'clients'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          >
+            Clients ({clients.length})
+          </button>
+        </div>
 
         {/* Filters */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
@@ -173,118 +169,180 @@ export default function AccountsList() {
             {/* Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Search by name or code
+                Search
               </label>
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
+                placeholder={activeTab === 'accounts' ? 'Search by name or code...' : 'Search by name or email...'}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
 
-            {/* Platform Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Platform
-              </label>
-              <select
-                value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">All Platforms</option>
-                <option value="Xero">Xero</option>
-                <option value="QuickBooks">QuickBooks</option>
-              </select>
-            </div>
+            {/* Type Filter (Accounts only) */}
+            {activeTab === 'accounts' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Account Type
+                </label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">All Types</option>
+                  {accountTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Accounts Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredAccounts.length === 0 ? (
-            <div className="col-span-2 text-center py-12 text-gray-500 dark:text-gray-400">
-              No accounts found
-            </div>
-          ) : (
-            filteredAccounts.map((account) => (
-              <div
-                key={account.id}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition p-6"
-              >
-                {/* Header */}
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">{account.name}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{account.code}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    account.platform === 'Xero'
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                      : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                  }`}>
-                    {account.platform}
-                  </span>
-                </div>
-
-                {/* Details */}
-                <div className="space-y-3 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Type:</span>
-                    <span className="text-gray-900 dark:text-white font-medium">{account.type}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Currency:</span>
-                    <span className="text-gray-900 dark:text-white font-medium">{account.currency}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Balance:</span>
-                    <span className={`text-lg font-bold ${
-                      account.balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {account.currency} {account.balance.toFixed(2)}
+        {/* Content */}
+        {activeTab === 'accounts' ? (
+          /* Accounts Grid */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredAccounts.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">
+                No accounts found
+              </div>
+            ) : (
+              filteredAccounts.map((account) => (
+                <div
+                  key={account.id}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition p-6"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        {account.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{account.code}</p>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        account.account_type === 'Revenue'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                          : account.account_type === 'Expense'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                          : account.account_type === 'Asset'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                          : account.account_type === 'Liability'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {account.account_type}
                     </span>
                   </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex justify-between items-center">
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Last sync:{' '}
-                    {new Date(account.lastSync).toLocaleString()}
+                  {account.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      {account.description}
+                    </p>
+                  )}
+                  <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                    <span
+                      className={`w-2 h-2 rounded-full mr-2 ${
+                        account.is_active ? 'bg-green-500' : 'bg-gray-400'
+                      }`}
+                    ></span>
+                    {account.is_active ? 'Active' : 'Inactive'}
                   </div>
-                  <button
-                    onClick={() => handleSync(account.id)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition"
-                  >
-                    Sync Now
-                  </button>
                 </div>
+              ))
+            )}
+          </div>
+        ) : (
+          /* Clients Grid */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredClients.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">
+                No clients found
               </div>
-            ))
-          )}
-        </div>
+            ) : (
+              filteredClients.map((client) => (
+                <div
+                  key={client.id}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition p-6"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        {client.name}
+                      </h3>
+                      {client.industry && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{client.industry}</p>
+                      )}
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        client.contact_type === 'customer'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                          : client.contact_type === 'supplier'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {client.contact_type
+                        ? client.contact_type.charAt(0).toUpperCase() + client.contact_type.slice(1)
+                        : 'Client'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    {client.email && (
+                      <div className="flex items-center text-gray-600 dark:text-gray-400">
+                        <span className="w-16 font-medium">Email:</span>
+                        <span>{client.email}</span>
+                      </div>
+                    )}
+                    {client.phone && (
+                      <div className="flex items-center text-gray-600 dark:text-gray-400">
+                        <span className="w-16 font-medium">Phone:</span>
+                        <span>{client.phone}</span>
+                      </div>
+                    )}
+                    {client.city && (
+                      <div className="flex items-center text-gray-600 dark:text-gray-400">
+                        <span className="w-16 font-medium">City:</span>
+                        <span>
+                          {client.city}
+                          {client.country && `, ${client.country}`}
+                        </span>
+                      </div>
+                    )}
+                    {client.tax_number && (
+                      <div className="flex items-center text-gray-600 dark:text-gray-400">
+                        <span className="w-16 font-medium">VAT:</span>
+                        <span>{client.tax_number}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Summary Stats */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Accounts</p>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-              {filteredAccounts.length}
-            </p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{accounts.length}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Balance</p>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-              £{filteredAccounts.reduce((sum, a) => sum + a.balance, 0).toFixed(2)}
-            </p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Clients</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{clients.length}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Active Accounts</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Active Items</p>
             <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">
-              {filteredAccounts.filter((a) => a.active).length}
+              {accounts.filter((a) => a.is_active).length + clients.filter((c) => c.is_active).length}
             </p>
           </div>
         </div>

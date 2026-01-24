@@ -205,69 +205,7 @@ async def api_v1_root() -> Dict[str, Any]:
     }
 
 
-# ============================================================================
-# PLACEHOLDER ROUTES (To be implemented in future tasks)
-# ============================================================================
-
-
-@app.get("/api/v1/organizations", tags=["Organizations"])
-async def list_organizations(db=Depends(get_db)) -> Dict[str, Any]:
-    """
-    List all organizations.
-
-    Currently a placeholder. Will be implemented in Task 4+.
-
-    Args:
-        db: Database session (dependency injection)
-
-    Returns:
-        List of organizations
-    """
-    return {
-        "message": "Organizations endpoint - Coming soon",
-        "status": "placeholder",
-    }
-
-
-@app.get("/api/v1/clients", tags=["Clients"])
-async def list_clients(db=Depends(get_db)) -> Dict[str, Any]:
-    """
-    List all clients.
-
-    Currently a placeholder. Will be implemented in Task 4+.
-
-    Args:
-        db: Database session (dependency injection)
-
-    Returns:
-        List of clients
-    """
-    return {
-        "message": "Clients endpoint - Coming soon",
-        "status": "placeholder",
-    }
-
-
-@app.get("/api/v1/transactions", tags=["Transactions"])
-async def list_transactions(db=Depends(get_db)) -> Dict[str, Any]:
-    """
-    List all transactions.
-
-    Currently a placeholder. Will be implemented in Task 4+.
-
-    Args:
-        db: Database session (dependency injection)
-
-    Returns:
-        List of transactions
-    """
-    return {
-        "message": "Transactions endpoint - Coming soon",
-        "status": "placeholder",
-    }
-
-
-# Include sync routes
+# Include API routers
 from backend.api.auth_routes import router as auth_router
 from backend.api.sync_routes import router as sync_router
 from backend.api.job_routes import router as job_router
@@ -275,12 +213,14 @@ from backend.api.dashboard_routes import router as dashboard_router
 from backend.api.analytics_routes import router as analytics_router
 from backend.api.reports_routes import router as reports_router
 from backend.api.mobile_routes import router as mobile_router
+from backend.api.data_routes import router as data_router
 from backend.api import job_routes as job_routes_module
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(job_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(data_router, prefix="/api/v1")
 app.include_router(analytics_router)
 app.include_router(reports_router)
 app.include_router(mobile_router)

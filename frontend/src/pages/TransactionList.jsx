@@ -1,7 +1,18 @@
+/**
+ * Transaction List Page
+ *
+ * Displays transactions from PostgreSQL database with filtering,
+ * sorting, pagination, and bulk operations.
+ *
+ * @author Claude Code
+ * @updated January 24, 2026
+ */
+
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
+import { transactionsAPI } from '../services/api'
 import Navigation from '../components/Navigation'
 import Pagination from '../components/Pagination'
 import DateRangeFilter from '../components/DateRangeFilter'
@@ -22,11 +33,12 @@ export default function TransactionList() {
   const [bulkLoading, setBulkLoading] = useState(false)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const bulk = useBulkSelection(transactions)
 
   useEffect(() => {
@@ -36,66 +48,59 @@ export default function TransactionList() {
   const fetchTransactions = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('authToken')
-      const response = await fetch('http://localhost:8000/api/v1/dashboard/transactions', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        // Use mock data for demo
-        setTransactions(generateMockTransactions())
-      } else {
-        const data = await response.json()
-        setTransactions(data.transactions || generateMockTransactions())
-      }
       setError(null)
+      const response = await transactionsAPI.list({ limit: 500 })
+      const data = response.data
+
+      // Transform backend data to frontend format
+      const transformed = (data.transactions || []).map((t) => ({
+        id: t.id,
+        description: t.description || 'No description',
+        amount: t.total_amount || t.amount || 0,
+        category: t.account_name || t.transaction_type || 'Uncategorized',
+        date: t.transaction_date,
+        status: formatStatus(t.status),
+        merchant: t.client_name || 'Unknown',
+        type: t.transaction_type,
+        reference: t.reference_number,
+        isReconciled: t.is_reconciled,
+      }))
+
+      setTransactions(transformed)
+      setTotalCount(data.total || transformed.length)
     } catch (err) {
       console.error('Error fetching transactions:', err)
-      // Use mock data on error
-      setTransactions(generateMockTransactions())
+      setError(err.response?.data?.detail || 'Failed to load transactions')
+      addToast('Failed to load transactions', 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  const generateMockTransactions = () => [
-    { id: '1', description: 'Office Supplies', amount: 125.50, category: 'Office Expenses', date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Staples' },
-    { id: '2', description: 'Internet Payment', amount: 79.99, category: 'Utilities', date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'BT Internet' },
-    { id: '3', description: 'Fuel', amount: 60.00, category: 'Travel & Transport', date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Needs Review', merchant: 'Shell Petrol' },
-    { id: '4', description: 'Coffee Meeting', amount: 15.50, category: 'Client Entertainment', date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Pending', merchant: 'Costa Coffee' },
-    { id: '5', description: 'Software License', amount: 299.00, category: 'Software & Subscriptions', date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Adobe Creative Cloud' },
-    { id: '6', description: 'Printer Paper', amount: 45.00, category: 'Office Expenses', date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Office Depot' },
-    { id: '7', description: 'Electric Bill', amount: 156.78, category: 'Utilities', date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'British Gas' },
-    { id: '8', description: 'Train Tickets', amount: 89.50, category: 'Travel & Transport', date: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'National Rail' },
-    { id: '9', description: 'Client Lunch', amount: 67.80, category: 'Client Entertainment', date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Needs Review', merchant: 'The Ivy' },
-    { id: '10', description: 'Cloud Storage', amount: 9.99, category: 'Software & Subscriptions', date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Dropbox' },
-    { id: '11', description: 'Office Chair', amount: 249.99, category: 'Office Expenses', date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'IKEA' },
-    { id: '12', description: 'Water Bill', amount: 42.30, category: 'Utilities', date: new Date(Date.now() - 18 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Pending', merchant: 'Thames Water' },
-    { id: '13', description: 'Parking Fees', amount: 25.00, category: 'Travel & Transport', date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Needs Review', merchant: 'NCP Parking' },
-    { id: '14', description: 'Team Dinner', amount: 185.50, category: 'Client Entertainment', date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Pizza Express' },
-    { id: '15', description: 'Antivirus Software', amount: 59.99, category: 'Software & Subscriptions', date: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Norton' },
-    { id: '16', description: 'Desk Lamp', amount: 35.00, category: 'Office Expenses', date: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Argos' },
-    { id: '17', description: 'Mobile Phone Bill', amount: 45.00, category: 'Utilities', date: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Vodafone' },
-    { id: '18', description: 'Uber Ride', amount: 18.75, category: 'Travel & Transport', date: new Date(Date.now() - 11 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Pending', merchant: 'Uber' },
-    { id: '19', description: 'Conference Tickets', amount: 350.00, category: 'Client Entertainment', date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Tech Conference UK' },
-    { id: '20', description: 'Project Management Tool', amount: 12.99, category: 'Software & Subscriptions', date: new Date(Date.now() - 16 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Trello' },
-    { id: '21', description: 'Keyboard', amount: 89.99, category: 'Office Expenses', date: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Needs Review', merchant: 'Amazon' },
-    { id: '22', description: 'Gas Bill', amount: 78.45, category: 'Utilities', date: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'British Gas' },
-    { id: '23', description: 'Airport Parking', amount: 95.00, category: 'Travel & Transport', date: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'Heathrow Parking' },
-    { id: '24', description: 'Networking Event', amount: 45.00, category: 'Client Entertainment', date: new Date(Date.now() - 19 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Pending', merchant: 'London Business Club' },
-    { id: '25', description: 'Domain Renewal', amount: 15.99, category: 'Software & Subscriptions', date: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], status: 'Categorized', merchant: 'GoDaddy' },
-  ]
+  const formatStatus = (status) => {
+    if (!status) return 'Pending'
+    const statusMap = {
+      paid: 'Categorized',
+      draft: 'Pending',
+      submitted: 'Needs Review',
+      authorised: 'Categorized',
+      voided: 'Voided',
+    }
+    return statusMap[status.toLowerCase()] || status
+  }
 
   const filteredTransactions = transactions.filter((t) => {
     const matchesSearch =
+      !search ||
       t.description.toLowerCase().includes(search.toLowerCase()) ||
-      t.merchant.toLowerCase().includes(search.toLowerCase())
-    const matchesCategory = !categoryFilter || t.category === categoryFilter
+      t.merchant.toLowerCase().includes(search.toLowerCase()) ||
+      (t.reference && t.reference.toLowerCase().includes(search.toLowerCase()))
+    const matchesType = !typeFilter || t.type === typeFilter
     const matchesStatus = !statusFilter || t.status === statusFilter
-    const transactionDate = new Date(t.date)
-    const matchesStartDate = !startDate || transactionDate >= new Date(startDate)
-    const matchesEndDate = !endDate || transactionDate <= new Date(endDate)
-    return matchesSearch && matchesCategory && matchesStatus && matchesStartDate && matchesEndDate
+    const transactionDate = t.date ? new Date(t.date) : null
+    const matchesStartDate = !startDate || (transactionDate && transactionDate >= new Date(startDate))
+    const matchesEndDate = !endDate || (transactionDate && transactionDate <= new Date(endDate))
+    return matchesSearch && matchesType && matchesStatus && matchesStartDate && matchesEndDate
   })
 
   const sort = useSortedItems(filteredTransactions)
@@ -117,7 +122,7 @@ export default function TransactionList() {
 
   useEffect(() => {
     handleFilterChange()
-  }, [search, categoryFilter, statusFilter, startDate, endDate])
+  }, [search, typeFilter, statusFilter, startDate, endDate])
 
   const handleResetDates = () => {
     setStartDate('')
@@ -128,8 +133,9 @@ export default function TransactionList() {
     exportToCSV(filteredTransactions, 'transactions', [
       { key: 'date', label: 'Date' },
       { key: 'description', label: 'Description' },
-      { key: 'merchant', label: 'Merchant' },
-      { key: 'category', label: 'Category' },
+      { key: 'merchant', label: 'Client' },
+      { key: 'category', label: 'Account' },
+      { key: 'type', label: 'Type' },
       { key: 'amount', label: 'Amount' },
       { key: 'status', label: 'Status' },
     ])
@@ -177,6 +183,32 @@ export default function TransactionList() {
     }
   }
 
+  // Get unique transaction types for filter dropdown
+  const transactionTypes = [...new Set(transactions.map((t) => t.type).filter(Boolean))]
+
+  if (error && transactions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+        <Navigation />
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-md text-center">
+            <div className="text-red-600 text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Unable to Load Transactions
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
+            <button
+              onClick={fetchTransactions}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (loading && transactions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -202,7 +234,9 @@ export default function TransactionList() {
         <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Transactions</h1>
-            <p className="text-gray-600 dark:text-gray-300">View and manage all transactions</p>
+            <p className="text-gray-600 dark:text-gray-300">
+              {totalCount.toLocaleString()} transactions from database
+            </p>
           </div>
           <div className="flex gap-4">
             <button
@@ -210,7 +244,7 @@ export default function TransactionList() {
               disabled={filteredTransactions.length === 0}
               className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              📥 Export CSV
+              Export CSV
             </button>
             <button
               onClick={handleLogout}
@@ -239,7 +273,6 @@ export default function TransactionList() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-
         {/* Filters */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Filters</h2>
@@ -247,33 +280,33 @@ export default function TransactionList() {
             {/* Search */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Search by description or merchant
+                Search
               </label>
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
+                placeholder="Search description, client, reference..."
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
 
-            {/* Category Filter */}
+            {/* Type Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Category
+                Transaction Type
               </label>
               <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
-                <option value="">All Categories</option>
-                <option value="Office Expenses">Office Expenses</option>
-                <option value="Utilities">Utilities</option>
-                <option value="Travel & Transport">Travel & Transport</option>
-                <option value="Client Entertainment">Client Entertainment</option>
-                <option value="Software & Subscriptions">Software & Subscriptions</option>
+                <option value="">All Types</option>
+                {transactionTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -309,7 +342,7 @@ export default function TransactionList() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
           {filteredTransactions.length === 0 ? (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              No transactions found
+              No transactions found matching your filters
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -340,13 +373,13 @@ export default function TransactionList() {
                       className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
                       onClick={() => sort.toggleSort('merchant')}
                     >
-                      Merchant {sort.getSortIndicator('merchant')}
+                      Client {sort.getSortIndicator('merchant')}
                     </th>
                     <th
                       className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                      onClick={() => sort.toggleSort('category')}
+                      onClick={() => sort.toggleSort('type')}
                     >
-                      Category {sort.getSortIndicator('category')}
+                      Type {sort.getSortIndicator('type')}
                     </th>
                     <th
                       className="px-6 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
@@ -364,7 +397,12 @@ export default function TransactionList() {
                 </thead>
                 <tbody className="divide-y dark:divide-gray-700">
                   {paginatedTransactions.map((transaction) => (
-                    <tr key={transaction.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${bulk.isItemSelected(transaction.id) ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
+                    <tr
+                      key={transaction.id}
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                        bulk.isItemSelected(transaction.id) ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+                      }`}
+                    >
                       <td className="px-4 py-4 text-center">
                         <input
                           type="checkbox"
@@ -374,7 +412,9 @@ export default function TransactionList() {
                         />
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(transaction.date).toLocaleDateString()}
+                        {transaction.date
+                          ? new Date(transaction.date).toLocaleDateString()
+                          : 'No date'}
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
                         {transaction.description}
@@ -383,7 +423,19 @@ export default function TransactionList() {
                         {transaction.merchant}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {transaction.category}
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            transaction.type === 'invoice'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                              : transaction.type === 'bill'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          {transaction.type
+                            ? transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)
+                            : 'Unknown'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-right text-gray-900 dark:text-white">
                         £{transaction.amount.toFixed(2)}
@@ -422,7 +474,9 @@ export default function TransactionList() {
         {/* Summary */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Transactions</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+              Filtered Transactions
+            </p>
             <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
               {filteredTransactions.length}
             </p>
@@ -430,7 +484,7 @@ export default function TransactionList() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Amount</p>
             <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-              £{filteredTransactions.reduce((sum, t) => sum + t.amount, 0).toFixed(2)}
+              £{filteredTransactions.reduce((sum, t) => sum + t.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
