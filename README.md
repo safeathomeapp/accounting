@@ -315,6 +315,29 @@ frontend/
 
 ---
 
+## Development Checklist
+
+### Before Starting Any Task
+- [ ] Read this README.md
+- [ ] Check current test count (must stay 903+)
+- [ ] Review ARCHITECTURE_PRINCIPLES.md
+- [ ] Understand the task completely (ask if <95% sure)
+
+### During Development
+- [ ] Write tests first (TDD)
+- [ ] Follow existing patterns
+- [ ] Document changes immediately
+- [ ] Commit frequently with clear messages
+
+### Before Ending Session
+- [ ] All tests passing
+- [ ] Documentation updated
+- [ ] Create SESSION_NOTES_YYYY-MM-DD.md
+- [ ] Commit all changes
+- [ ] Note what's next
+
+---
+
 ## Essential References
 
 ### Architecture & Design
@@ -323,6 +346,9 @@ frontend/
 | Architecture Principles | `/docs/architecture/ARCHITECTURE_PRINCIPLES.md` | Core design principles |
 | Abstraction Layer | `/docs/architecture/abstraction_layer.md` | Platform adapter design |
 | Future Features | `/FUTURE_FEATURES.md` | Planned enhancements |
+| Original Roadmap | `/DEFINITIVE_ROADMAP_V2.md` | Full project roadmap |
+| API Endpoints | `/backend/api/` | REST API implementation |
+| Database Models | `/backend/models/` | SQLAlchemy model definitions |
 
 ### Database
 | Document | Location | Purpose |
