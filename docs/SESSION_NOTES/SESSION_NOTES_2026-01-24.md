@@ -2,6 +2,17 @@
 
 ## Completed
 
+### Phase 4A: Database Hardening - COMPLETE
+- Ran pre-flight validation queries (all passed - 0 data issues)
+- Created and applied 4 Alembic migrations:
+  - **v2_010**: Defaults and updated_at triggers (timestamp defaults, boolean defaults, trigger function)
+  - **v2_020**: Currency and amount CHECK constraints (ISO currency format, non-negative tax, total arithmetic)
+  - **v2_030**: FK indexes for ai_analysis_results (suggested_account_id indexes)
+  - **v2_040**: Organization-scoped platform uniqueness (CRITICAL - fixes multi-tenancy)
+- Extended alembic_version.version_num column to VARCHAR(128) for longer revision IDs
+- Verified all 903 tests still pass after migrations
+- Database now at revision: `v2_040_org_scoped_platform_uniqueness`
+
 ### FreeAgent Platform Documentation
 - Created comprehensive FreeAgent API Guide (`/docs/PLATFORM_GUIDES/FREEAGENT_API_GUIDE.md`)
   - OAuth 2.0 authentication flow with HTTP Basic Auth for token requests
@@ -48,6 +59,7 @@
 
 ## In Progress
 - Awaiting FreeAgent sandbox API access (email sent to integrationsrequests@freeagent.com)
+- Phase 4A complete - ready for Phase 4B (Platform Expansion) or Phase 4C (Backend Integration)
 
 ## Blockers
 - Cannot proceed with FreeAgent implementation until sandbox credentials received
@@ -83,6 +95,10 @@
 - `/docs/architecture/abstraction_layer.md` - UPDATED: Added Platform Implementation Strategy section
 - `/docs/DATABASE_ARCHITECTURE/` - NEW: Entire folder with team's database documentation
 - `README.md` - MAJOR UPDATE: Complete roadmap restructure with Phase 4A database hardening
+- `/alembic/versions/v2_010_defaults_and_updated_at_triggers.py` - NEW: Defaults and triggers migration
+- `/alembic/versions/v2_020_currency_and_amount_checks.py` - NEW: CHECK constraints migration
+- `/alembic/versions/v2_030_fk_index_gaps_ai_analysis_results.py` - NEW: FK indexes migration
+- `/alembic/versions/v2_040_org_scoped_platform_uniqueness.py` - NEW: Org-scoped uniqueness migration (CRITICAL)
 - `/docs/SESSION_NOTES/SESSION_NOTES_2026-01-24.md` - NEW: This file
 
 ## Key Decisions Made

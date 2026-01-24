@@ -56,7 +56,7 @@
 |-----------|--------|-------|
 | Backend | ✅ Complete | 903/903 tests passing |
 | Frontend | ✅ Phase 3 Complete | Full web interface ready |
-| Database Schema | ⚠️ Hardening Required | See Phase 4A below |
+| Database Schema | ✅ Hardened | Phase 4A complete (Jan 24, 2026) |
 | Platform Adapters | ✅ Xero + QuickBooks | FreeAgent docs ready |
 | Dark Mode | ✅ Fixed | Verified Jan 22, 2026 |
 | Mock Data | ✅ Expanded | 25 transactions for testing |
@@ -105,9 +105,9 @@
 
 ---
 
-### Phase 4A: Database Hardening ⚠️ CRITICAL - DO FIRST
+### Phase 4A: Database Hardening ✅ COMPLETE
 **Goal**: Production-ready database before connecting frontend
-**Status**: Planned
+**Status**: Complete (January 24, 2026)
 **Priority**: MANDATORY before Phase 4B
 
 #### Why This Is Required
@@ -150,14 +150,14 @@ WHERE total_amount != amount + tax_amount;
 ```
 
 **Implementation Order:**
-- [ ] Run pre-flight validation queries
-- [ ] Fix any data issues found
-- [ ] Apply v2_040 (org-scoped uniqueness) - CRITICAL
-- [ ] Apply v2_020 (currency/amount checks) - HIGH
-- [ ] Apply v2_010 (defaults/triggers) - MEDIUM
-- [ ] Apply v2_030 (FK indexes) - LOW
-- [ ] Verify all 903 tests still pass
-- [ ] Document completion in session notes
+- [x] Run pre-flight validation queries
+- [x] Fix any data issues found (none found)
+- [x] Apply v2_010 (defaults/triggers) - MEDIUM
+- [x] Apply v2_020 (currency/amount checks) - HIGH
+- [x] Apply v2_030 (FK indexes) - LOW
+- [x] Apply v2_040 (org-scoped uniqueness) - CRITICAL
+- [x] Verify all 903 tests still pass
+- [x] Document completion in session notes
 
 **Time Estimate**: 2-3 hours
 
