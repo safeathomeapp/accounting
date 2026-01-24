@@ -1,0 +1,1 @@
+SELECT table_schema, table_name, privilege_type, grantee FROM information_schema.table_privileges ORDER BY 1,2;

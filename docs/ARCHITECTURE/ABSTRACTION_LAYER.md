@@ -43,7 +43,8 @@ The abstraction layer is the foundation of our multi-platform approach. It enabl
 │  Platform Adapters (Specific Implementations)   │
 │  - XeroClient extends AccountingClient         │
 │  - QuickBooksClient extends AccountingClient   │
-│  - [Future: SageClient, FreeAgentClient]       │
+│  - FreeAgentClient extends AccountingClient    │
+│  - [Future: ClearBooks, FreshBooks, Sage]      │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -233,6 +234,11 @@ platforms = AccountingClientFactory.supported_platforms()
 PLATFORM_CLIENTS = {
     "xero": "backend.accounting.xero.client.XeroClient",
     "quickbooks": "backend.accounting.quickbooks.client.QuickBooksClient",
+    "freeagent": "backend.accounting.freeagent.client.FreeAgentClient",
+    # Future platforms:
+    # "clearbooks": "backend.accounting.clearbooks.client.ClearBooksClient",
+    # "freshbooks": "backend.accounting.freshbooks.client.FreshBooksClient",
+    # "sage": "backend.accounting.sage.client.SageClient",
 }
 ```
 
@@ -367,13 +373,16 @@ class SageClient(AccountingClient):
 PLATFORM_CLIENTS = {
     "xero": "backend.accounting.xero.client.XeroClient",
     "quickbooks": "backend.accounting.quickbooks.client.QuickBooksClient",
+    "freeagent": "backend.accounting.freeagent.client.FreeAgentClient",
+    "clearbooks": "backend.accounting.clearbooks.client.ClearBooksClient",
+    "freshbooks": "backend.accounting.freshbooks.client.FreshBooksClient",
     "sage": "backend.accounting.sage.client.SageClient",  # Add this
 }
 ```
 
 **Step 4: Done!**
 
-All business logic automatically works with Sage.
+All business logic automatically works with the new platform.
 
 ---
 
@@ -406,6 +415,76 @@ All business logic automatically works with Sage.
 - Documentation - all valid values in one place
 - IDE support - autocomplete for enum values
 - Refactoring - rename value everywhere at once
+
+---
+
+## 🔐 Platform Implementation Strategy
+
+### Phased Implementation Approach
+
+All platform adapters follow a phased implementation strategy:
+
+**Phase 1: Read-Only Operations**
+- `get_transactions()`, `get_transaction()`
+- `get_contacts()`, `get_contact()`
+- `get_accounts()`, `get_account()`
+- `get_organization_info()`, `get_sync_status()`
+- `authenticate()`
+
+Write methods (`create_*`, `update_*`) raise `NotImplementedError`:
+
+```python
+def create_transaction(self, transaction: StandardTransaction) -> StandardTransaction:
+    """Create transaction in platform.
+
+    Note: Not implemented in Phase 1 (read-only access).
+    """
+    raise NotImplementedError("Phase 1: Read-only access to [Platform]")
+```
+
+**Phase 2+: Write Operations**
+- `create_transaction()`, `update_transaction()`
+- `create_contact()`, `update_contact()`
+- Additional endpoints as needed (delete, void, etc.)
+
+### API Access Requirements
+
+**IMPORTANT:** When registering applications with accounting platforms, always request **full read-write access**, even for Phase 1 implementation.
+
+Reasons:
+1. **Avoid re-authorization** - Users won't need to re-approve when write features are added
+2. **Simpler OAuth scopes** - Most platforms bundle read/write together
+3. **Future-proof** - No need to update app registrations later
+4. **Testing flexibility** - Can test write operations in sandbox immediately
+
+**Example OAuth Scopes to Request:**
+
+| Platform | Scopes |
+|----------|--------|
+| Xero | `offline_access accounting.transactions accounting.contacts accounting.settings` |
+| QuickBooks | `com.intuit.quickbooks.accounting` (includes read/write) |
+| FreeAgent | Full access via Practice API (no scope restrictions) |
+| ClearBooks | TBC - pending API research |
+| FreshBooks | TBC - pending API research |
+| Sage | TBC - pending API research |
+
+### Why Read-Only First?
+
+1. **Safety** - No risk of corrupting client accounting data during development
+2. **Testing** - Easier to verify correct data mapping without side effects
+3. **Incremental** - Build confidence before adding write operations
+4. **Reversible** - Read operations can be re-run; write operations cannot be undone
+
+### Implementation Checklist for New Platforms
+
+When implementing a new platform adapter:
+
+- [ ] Request **full read-write API access** from platform
+- [ ] Implement all read methods first (Phase 1)
+- [ ] Write methods should raise `NotImplementedError`
+- [ ] Add `# TODO: Phase 2 - Implement write operations` comments
+- [ ] Document any platform-specific write requirements in API Guide
+- [ ] Test read operations thoroughly before Phase 2
 
 ---
 

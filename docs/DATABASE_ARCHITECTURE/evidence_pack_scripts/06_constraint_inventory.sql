@@ -1,0 +1,1 @@
+SELECT conname, conrelid::regclass, pg_get_constraintdef(oid) FROM pg_constraint ORDER BY 2;

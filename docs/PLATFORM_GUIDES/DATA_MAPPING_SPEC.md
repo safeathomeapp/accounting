@@ -654,3 +654,518 @@ standard_account = mapper.map_account_to_standard(xero_account)
 **Next Doc:** [XERO_IMPLEMENTATION_BLUEPRINT.md](XERO_IMPLEMENTATION_BLUEPRINT.md)
 
 ---
+
+# FreeAgent Data Mapping Specification
+
+**Added:** January 24, 2026
+**Purpose:** Define exact mappings from FreeAgent API data to StandardTransaction, StandardContact, StandardAccount
+
+---
+
+## FreeAgent Overview
+
+FreeAgent is a UK-focused accounting platform with some key differences from Xero:
+- Uses URL-based resource identifiers (not simple IDs)
+- Uses "Categories" with nominal codes instead of chart of accounts
+- No explicit customer/supplier types on contacts
+- Date format: `YYYY-MM-DD` (simple dates) or ISO 8601 (timestamps)
+
+---
+
+## FreeAgent StandardTransaction Mapping
+
+### Source: FreeAgent Invoice
+
+FreeAgent Invoice → StandardTransaction with type=INVOICE
+
+```
+FreeAgent Field          →  StandardTransaction Field   →  Notes
+─────────────────────────────────────────────────────────────────────────
+url (extract ID)         →  id                          →  Extract from URL
+"INVOICE"                →  type                        →  Hardcode INVOICE
+dated_on                 →  date                        →  Parse YYYY-MM-DD
+reference                →  reference                   →  "INV-001"
+(from invoice_items[0])  →  description                 →  First item description
+total_value              →  amount                      →  Decimal from response
+sales_tax_value          →  tax_amount                  →  Decimal from response
+status                   →  status                      →  Map per table below
+contact (extract ID)     →  contact_id                  →  Extract from URL
+invoice_items[0].category → account_id                  →  First item's category ID
+(none)                   →  platform_id                 →  Same as id
+"freeagent"              →  platform_name               →  Hardcode "freeagent"
+(none)                   →  sync_status                 →  Default: SyncStatus.SYNCED
+invoice_items            →  line_items                  →  Array of item dicts
+due_on, currency, etc.   →  metadata                    →  Extra FreeAgent data
+```
+
+### Source: FreeAgent Bill
+
+FreeAgent Bill → StandardTransaction with type=BILL
+
+```
+FreeAgent Field          →  StandardTransaction Field   →  Notes
+─────────────────────────────────────────────────────────────────────────
+url (extract ID)         →  id                          →  Extract from URL
+"BILL"                   →  type                        →  Hardcode BILL
+dated_on                 →  date                        →  Parse YYYY-MM-DD
+reference                →  reference                   →  "BILL-001"
+(from bill_items[0])     →  description                 →  First item description
+total_value              →  amount                      →  Decimal from response
+sales_tax_value          →  tax_amount                  →  Decimal from response
+status                   →  status                      →  Map per table below
+contact (extract ID)     →  contact_id                  →  Extract from URL
+bill_items[0].category   →  account_id                  →  First item's category ID
+(none)                   →  platform_id                 →  Same as id
+"freeagent"              →  platform_name               →  Hardcode "freeagent"
+(none)                   →  sync_status                 →  Default: SyncStatus.SYNCED
+bill_items               →  line_items                  →  Array of item dicts
+due_on, currency, etc.   →  metadata                    →  Extra FreeAgent data
+```
+
+### Source: FreeAgent Credit Note
+
+FreeAgent Credit Note → StandardTransaction with type=CREDIT_NOTE
+
+```
+FreeAgent Field          →  StandardTransaction Field   →  Notes
+─────────────────────────────────────────────────────────────────────────
+url (extract ID)         →  id                          →  Extract from URL
+"CREDIT_NOTE"            →  type                        →  Hardcode CREDIT_NOTE
+dated_on                 →  date                        →  Parse YYYY-MM-DD
+reference                →  reference                   →  "CN-001"
+(none)                   →  description                 →  Use reference
+total_value              →  amount                      →  Decimal (may be negative)
+sales_tax_value          →  tax_amount                  →  Decimal (may be negative)
+status                   →  status                      →  Map per table below
+contact (extract ID)     →  contact_id                  →  Extract from URL
+credit_note_items[0].category → account_id              →  First item's category ID
+(none)                   →  platform_id                 →  Same as id
+"freeagent"              →  platform_name               →  Hardcode "freeagent"
+```
+
+### Invoice Status Mapping
+
+```
+FreeAgent Status       →  StandardTransaction.status   →  Notes
+─────────────────────────────────────────────────────────────────
+Draft                  →  "draft"                      →  Not yet sent
+Scheduled To Email     →  "scheduled"                  →  Awaiting send
+Open                   →  "approved"                   →  Sent, awaiting payment
+Zero Value             →  "approved"                   →  No payment needed
+Overdue                →  "overdue"                    →  Past due date
+Paid                   →  "paid"                       →  Fully paid
+Overpaid               →  "paid"                       →  Paid more than due
+Refunded               →  "refunded"                   →  Money returned
+Written-off            →  "written_off"                →  Bad debt
+Part written-off       →  "partial_written_off"        →  Partial bad debt
+```
+
+### Bill Status Mapping
+
+```
+FreeAgent Status       →  StandardTransaction.status   →  Notes
+─────────────────────────────────────────────────────────────────
+Zero Value             →  "approved"                   →  No payment needed
+Open                   →  "approved"                   →  Awaiting payment
+Paid                   →  "paid"                       →  Fully paid
+Overdue                →  "overdue"                    →  Past due date
+Refunded               →  "refunded"                   →  Money returned
+```
+
+### Credit Note Status Mapping
+
+```
+FreeAgent Status       →  StandardTransaction.status   →  Notes
+─────────────────────────────────────────────────────────────────
+Draft                  →  "draft"                      →  Not yet sent
+Open                   →  "approved"                   →  Active
+Overdue                →  "overdue"                    →  Past due
+Refunded               →  "refunded"                   →  Applied/used
+Written-off            →  "written_off"                →  Cancelled
+```
+
+---
+
+## FreeAgent StandardContact Mapping
+
+### Source: FreeAgent Contact
+
+FreeAgent Contact → StandardContact
+
+```
+FreeAgent Field          →  StandardContact Field   →  Notes
+──────────────────────────────────────────────────────────────
+url (extract ID)         →  id                      →  Extract from URL
+organisation_name        →  name                    →  Or first_name + last_name
+email                    →  email                   →  Primary email
+phone_number             →  phone                   →  Office phone
+address1/2/3/town/etc.   →  address                 →  Concatenated string
+sales_tax_registration_number → tax_id              →  VAT number
+(inferred)               →  type                    →  See type inference below
+"GBP"                    →  currency                →  Default for UK
+url (extract ID)         →  platform_id             →  Same as id
+"freeagent"              →  platform_name           →  Hardcode "freeagent"
+other fields             →  metadata                →  Extra data
+```
+
+### Contact Type Inference
+
+FreeAgent doesn't have explicit contact types. Infer from context:
+
+```python
+# Method 1: Use API view parameter
+GET /contacts?view=clients    → ContactType.CUSTOMER
+GET /contacts?view=suppliers  → ContactType.SUPPLIER
+
+# Method 2: Check transaction usage (requires additional queries)
+# - Contact appears in invoices → CUSTOMER
+# - Contact appears in bills → SUPPLIER
+
+# Method 3: Default
+# - Default to ContactType.CUSTOMER if unknown
+```
+
+### Contact Name Building
+
+```python
+# Priority 1: Organisation name
+if contact.get("organisation_name"):
+    name = contact["organisation_name"]
+
+# Priority 2: First + Last name
+elif contact.get("first_name") or contact.get("last_name"):
+    name = f"{contact.get('first_name', '')} {contact.get('last_name', '')}".strip()
+
+# Priority 3: Empty string (shouldn't happen)
+else:
+    name = ""
+```
+
+### Address Building
+
+```python
+address_parts = [
+    contact.get("address1"),
+    contact.get("address2"),
+    contact.get("address3"),
+    contact.get("town"),
+    contact.get("region"),
+    contact.get("postcode"),
+    contact.get("country"),
+]
+address = ", ".join(filter(None, address_parts))
+```
+
+---
+
+## FreeAgent StandardAccount Mapping
+
+### Source: FreeAgent Category
+
+FreeAgent uses "Categories" with nominal codes instead of a traditional chart of accounts.
+
+FreeAgent Category → StandardAccount
+
+```
+FreeAgent Field          →  StandardAccount Field   →  Notes
+───────────────────────────────────────────────────────────────
+nominal_code             →  id                      →  e.g., "001", "200"
+nominal_code             →  code                    →  Same as id
+description              →  name                    →  e.g., "Sales"
+(from code range)        →  type                    →  Map per table below
+auto_sales_tax_rate      →  tax_type                →  e.g., "Standard Rate"
+"GBP"                    →  currency                →  Default for UK
+nominal_code             →  platform_id             →  Same as id
+"freeagent"              →  platform_name           →  Hardcode "freeagent"
+group_description, etc.  →  metadata                →  Extra data
+```
+
+### Category Type Mapping (Nominal Code Ranges)
+
+```
+Nominal Code Range     →  StandardAccount.type   →  FreeAgent Usage
+──────────────────────────────────────────────────────────────────
+001-049               →  AccountType.INCOME      →  Income
+096-199               →  AccountType.EXPENSE     →  Cost of Sales
+200-399               →  AccountType.EXPENSE     →  Admin Expenses
+671-720               →  AccountType.ASSET       →  Current Assets
+731-780               →  AccountType.LIABILITY   →  Liabilities
+921-960               →  AccountType.EQUITY      →  Equities
+(other)               →  AccountType.EXPENSE     →  Default
+```
+
+### Implementation
+
+```python
+def map_category_type(nominal_code: str) -> AccountType:
+    try:
+        code = int(nominal_code)
+    except (ValueError, TypeError):
+        return AccountType.EXPENSE  # Default
+
+    if 1 <= code <= 49:
+        return AccountType.INCOME
+    elif 96 <= code <= 199:
+        return AccountType.EXPENSE  # Cost of Sales
+    elif 200 <= code <= 399:
+        return AccountType.EXPENSE  # Admin Expenses
+    elif 671 <= code <= 720:
+        return AccountType.ASSET
+    elif 731 <= code <= 780:
+        return AccountType.LIABILITY
+    elif 921 <= code <= 960:
+        return AccountType.EQUITY
+    else:
+        return AccountType.EXPENSE
+```
+
+---
+
+## FreeAgent Special Cases & Transformations
+
+### 1. URL ID Extraction
+
+FreeAgent uses URLs as identifiers:
+```
+"contact": "https://api.freeagent.com/v2/contacts/12345"
+```
+
+**Handling:**
+```python
+def extract_id_from_url(url: str) -> str:
+    if not url:
+        return ""
+    return url.rstrip('/').split('/')[-1]
+
+# Example:
+extract_id_from_url("https://api.freeagent.com/v2/invoices/12345")
+# Returns: "12345"
+```
+
+### 2. Date Parsing
+
+FreeAgent uses two date formats:
+
+**Simple dates (transactions):**
+```
+"dated_on": "2026-01-15"
+```
+
+**ISO 8601 timestamps (metadata):**
+```
+"created_at": "2026-01-15T10:30:00Z"
+```
+
+**Handling:**
+```python
+from datetime import datetime, date
+
+def parse_freeagent_date(date_string: str) -> date:
+    """Parse simple date."""
+    return datetime.strptime(date_string, "%Y-%m-%d").date()
+
+def parse_freeagent_datetime(datetime_string: str) -> datetime:
+    """Parse ISO 8601 datetime."""
+    return datetime.fromisoformat(datetime_string.replace("Z", "+00:00"))
+```
+
+### 3. Nested Items
+
+To get line items, add query parameter:
+```
+GET /invoices?nested_invoice_items=true
+GET /bills?nested_bill_items=true
+GET /credit_notes?nested_credit_note_items=true
+```
+
+Without this, items are not included in list responses.
+
+### 4. Currency Handling
+
+FreeAgent defaults to company currency (usually GBP for UK businesses).
+
+```python
+# Get currency from invoice, default to GBP
+currency = invoice.get("currency", "GBP")
+
+# Exchange rate for multi-currency
+exchange_rate = invoice.get("exchange_rate", "1.0")
+```
+
+### 5. VAT/Tax Handling
+
+FreeAgent tracks VAT with:
+```python
+# On categories
+"auto_sales_tax_rate": "Standard Rate"  # or "Zero Rate", "Reduced Rate", "Exempt", "Outside Scope"
+
+# On contacts
+"sales_tax_registration_number": "GB123456789"
+
+# On invoices/bills
+"ec_status": "UK"  # or "Non-EC", "EC Goods", "EC Services", "Reverse Charge"
+```
+
+---
+
+## FreeAgent Error Handling & Fallbacks
+
+### Missing Fields
+
+```python
+# If description missing, use reference
+description = invoice.get("reference", "")
+if invoice.get("invoice_items"):
+    description = invoice["invoice_items"][0].get("description", description)
+
+# If contact missing, set to None
+contact_url = invoice.get("contact", "")
+contact_id = extract_id_from_url(contact_url) if contact_url else None
+
+# If items empty, use empty list
+line_items = invoice.get("invoice_items", [])
+```
+
+### Invalid Data Types
+
+```python
+from decimal import Decimal
+
+# Amounts - FreeAgent returns strings
+amount = Decimal(str(invoice.get("total_value", "0")))
+
+# Dates - may be None
+date_str = invoice.get("dated_on")
+if date_str:
+    date_obj = parse_freeagent_date(date_str)
+else:
+    date_obj = None
+
+# IDs - extract from URL
+contact_id = extract_id_from_url(invoice.get("contact", ""))
+```
+
+---
+
+## FreeAgent Implementation Checklist
+
+### StandardTransaction Mapper
+
+- [ ] Handle Invoice → type=INVOICE
+- [ ] Handle Bill → type=BILL
+- [ ] Handle Credit Note → type=CREDIT_NOTE
+- [ ] Extract IDs from URLs
+- [ ] Parse dates (YYYY-MM-DD format)
+- [ ] Convert amounts to Decimal
+- [ ] Map all status values correctly
+- [ ] Handle missing contact (set to None)
+- [ ] Extract category from first line item
+- [ ] Store all line items in line_items array
+- [ ] Set platform_name = "freeagent"
+- [ ] Set sync_status = SyncStatus.SYNCED
+- [ ] Store extra fields in metadata
+
+### StandardContact Mapper
+
+- [ ] Extract ID from URL
+- [ ] Build name from organisation_name or first/last name
+- [ ] Concatenate address fields
+- [ ] Handle missing email/phone gracefully
+- [ ] Store VAT number in tax_id
+- [ ] Accept contact_type from caller (view=clients/suppliers)
+- [ ] Set platform_name = "freeagent"
+- [ ] Store all extra fields in metadata
+
+### StandardAccount Mapper (Category)
+
+- [ ] Use nominal_code as id and code
+- [ ] Map nominal code range → AccountType enum
+- [ ] Store auto_sales_tax_rate as tax_type
+- [ ] Set platform_name = "freeagent"
+- [ ] Default currency to "GBP"
+- [ ] Store group_description in metadata
+
+### Edge Cases
+
+- [ ] Handle empty URLs (return empty string for ID)
+- [ ] Handle missing line items (use empty list)
+- [ ] Handle invalid dates (return None or raise)
+- [ ] Handle rate limiting (429 with Retry-After)
+- [ ] Handle pagination (page and per_page params)
+
+---
+
+## FreeAgent Usage Example
+
+```python
+from backend.accounting.freeagent.mapper import FreeAgentMapper
+
+# Initialize mapper
+mapper = FreeAgentMapper()
+
+# Map FreeAgent invoice to StandardTransaction
+freeagent_invoice = {
+    "url": "https://api.freeagent.com/v2/invoices/12345",
+    "contact": "https://api.freeagent.com/v2/contacts/67890",
+    "dated_on": "2026-01-15",
+    "reference": "INV-001",
+    "total_value": "1200.00",
+    "sales_tax_value": "200.00",
+    "status": "Open",
+    "invoice_items": [
+        {
+            "description": "Consulting",
+            "quantity": "10",
+            "price": "100.00",
+            "category": "https://api.freeagent.com/v2/categories/001",
+        }
+    ],
+}
+
+standard_transaction = mapper.map_invoice_to_transaction(freeagent_invoice)
+# Returns StandardTransaction:
+#   id="12345", type=INVOICE, amount=1200.00, contact_id="67890", account_id="001"
+
+# Map FreeAgent contact to StandardContact
+freeagent_contact = {
+    "url": "https://api.freeagent.com/v2/contacts/67890",
+    "organisation_name": "ACME Corp",
+    "email": "hello@acme.com",
+    "phone_number": "020 1234 5678",
+    "address1": "123 Main Street",
+    "town": "London",
+    "postcode": "SW1A 1AA",
+}
+
+standard_contact = mapper.map_contact_to_standard(
+    freeagent_contact,
+    contact_type=ContactType.CUSTOMER
+)
+# Returns StandardContact:
+#   id="67890", name="ACME Corp", type=CUSTOMER
+
+# Map FreeAgent category to StandardAccount
+freeagent_category = {
+    "url": "https://api.freeagent.com/v2/categories/001",
+    "description": "Sales",
+    "nominal_code": "001",
+    "auto_sales_tax_rate": "Standard Rate",
+}
+
+standard_account = mapper.map_category_to_account(freeagent_category)
+# Returns StandardAccount:
+#   id="001", code="001", name="Sales", type=INCOME
+```
+
+---
+
+## Related Documentation
+
+- [FREEAGENT_API_GUIDE.md](FREEAGENT_API_GUIDE.md) - FreeAgent API endpoints and authentication
+- [FREEAGENT_IMPLEMENTATION_BLUEPRINT.md](FREEAGENT_IMPLEMENTATION_BLUEPRINT.md) - Step-by-step implementation
+- [XERO_API_GUIDE.md](XERO_API_GUIDE.md) - Xero API (for comparison)
+
+---
+
+**FreeAgent Section Added:** January 24, 2026
+**Status:** Ready for Implementation

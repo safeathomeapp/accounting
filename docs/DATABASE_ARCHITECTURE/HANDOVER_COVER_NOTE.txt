@@ -1,0 +1,21 @@
+Subject: Database Architecture & Governance Handover Package
+
+Hi,
+
+Please find attached the database handover package for the accounting platform.
+
+This package contains:
+- A master governance document describing architectural intent, controls, and regulatory alignment.
+- A full technical compendium containing schema audits, assumptions analysis, and Alembic v2 migration definitions.
+- Operational scripts to generate audit and evidence artefacts directly from PostgreSQL.
+
+The database has been designed and reviewed with:
+- SaaS-readiness in mind,
+- FCA-aligned data integrity and auditability expectations,
+- and long-term operational resilience.
+
+No application code changes are required to apply the v2 schema hardening; all changes are database-level and migration-driven.
+
+If you have any questions during review or execution, please raise them before applying changes to production.
+
+Best regards,
