@@ -1,8 +1,18 @@
 import { create } from 'zustand'
 
+// Helper to get stored user
+const getStoredUser = () => {
+  try {
+    const stored = localStorage.getItem('authUser')
+    return stored ? JSON.parse(stored) : null
+  } catch {
+    return null
+  }
+}
+
 export const useAuthStore = create((set) => ({
   isAuthenticated: !!localStorage.getItem('authToken'),
-  user: null,
+  user: getStoredUser(),
   loading: false,
   error: null,
 
@@ -19,13 +29,16 @@ export const useAuthStore = create((set) => ({
 
       const data = await response.json()
       localStorage.setItem('authToken', data.token)
+      localStorage.setItem('authUser', JSON.stringify(data.user))
       set({ isAuthenticated: true, user: data.user, loading: false })
       return true
     } catch (error) {
       // Demo fallback - allow login with test credentials when API unavailable
       if (email === 'test@example.com') {
+        const demoUser = { email, name: 'Demo User' }
         localStorage.setItem('authToken', 'demo-token-12345')
-        set({ isAuthenticated: true, user: { email, name: 'Demo User' }, loading: false })
+        localStorage.setItem('authUser', JSON.stringify(demoUser))
+        set({ isAuthenticated: true, user: demoUser, loading: false })
         return true
       }
       set({ error: error.message, loading: false })
@@ -35,11 +48,13 @@ export const useAuthStore = create((set) => ({
 
   logout: () => {
     localStorage.removeItem('authToken')
+    localStorage.removeItem('authUser')
     set({ isAuthenticated: false, user: null })
   },
 
   checkAuth: () => {
     const token = localStorage.getItem('authToken')
-    set({ isAuthenticated: !!token })
+    const user = getStoredUser()
+    set({ isAuthenticated: !!token, user })
   },
 }))

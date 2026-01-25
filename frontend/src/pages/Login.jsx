@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
 
@@ -75,6 +75,13 @@ export default function Login() {
 
         <p className="text-center text-gray-600 dark:text-gray-400 text-sm mt-6">
           Demo credentials: test@example.com
+        </p>
+
+        <p className="text-center text-gray-600 dark:text-gray-400 text-sm mt-4">
+          Don't have an account?{' '}
+          <Link to="/register" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium">
+            Create one
+          </Link>
         </p>
       </div>
     </div>

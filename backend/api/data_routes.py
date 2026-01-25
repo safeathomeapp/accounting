@@ -13,10 +13,12 @@ from uuid import UUID
 from typing import Optional, List
 from datetime import date
 from decimal import Decimal
+import uuid as uuid_module
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+from pydantic import BaseModel, Field
 
 from backend.database import get_db
 from backend.models.organization import Organization
@@ -27,6 +29,89 @@ from backend.models.account import Account
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["data"])
+
+
+# ============================================================================
+# PYDANTIC SCHEMAS FOR CRUD
+# ============================================================================
+
+class TransactionCreate(BaseModel):
+    """Schema for creating a transaction."""
+    client_id: Optional[str] = None
+    account_id: Optional[str] = None
+    transaction_type: str = "invoice"
+    reference_number: Optional[str] = None
+    description: Optional[str] = None
+    amount: float = 0.0
+    tax_amount: float = 0.0
+    total_amount: float = 0.0
+    currency: str = "GBP"
+    transaction_date: date
+    due_date: Optional[date] = None
+    status: str = "draft"
+    organization_id: Optional[str] = None
+
+
+class TransactionUpdate(BaseModel):
+    """Schema for updating a transaction."""
+    client_id: Optional[str] = None
+    account_id: Optional[str] = None
+    transaction_type: Optional[str] = None
+    reference_number: Optional[str] = None
+    description: Optional[str] = None
+    amount: Optional[float] = None
+    tax_amount: Optional[float] = None
+    total_amount: Optional[float] = None
+    currency: Optional[str] = None
+    transaction_date: Optional[date] = None
+    due_date: Optional[date] = None
+    status: Optional[str] = None
+    is_reconciled: Optional[bool] = None
+
+
+class BulkDeleteRequest(BaseModel):
+    """Schema for bulk delete operations."""
+    ids: List[str]
+
+
+class BulkStatusUpdate(BaseModel):
+    """Schema for bulk status update."""
+    ids: List[str]
+    status: str
+
+
+class ClientCreate(BaseModel):
+    """Schema for creating a client."""
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+    contact_type: str = "customer"
+    industry: Optional[str] = None
+    tax_number: Optional[str] = None
+    organization_id: Optional[str] = None
+
+
+class ClientUpdate(BaseModel):
+    """Schema for updating a client."""
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+    contact_type: Optional[str] = None
+    industry: Optional[str] = None
+    tax_number: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 # ============================================================================
@@ -179,6 +264,123 @@ def get_client(
     }
 
 
+@router.post("/clients")
+def create_client(
+    data: ClientCreate,
+    db: Session = Depends(get_db),
+):
+    """Create a new client."""
+    # Get organization from request or fall back to first active
+    if data.organization_id:
+        org = db.query(Organization).filter(Organization.id == UUID(data.organization_id)).first()
+    else:
+        org = db.query(Organization).filter(Organization.is_active == True).first()
+
+    if not org:
+        raise HTTPException(status_code=400, detail="No organization found")
+
+    # Create client with generated platform_id
+    client = Client(
+        organization_id=org.id,
+        platform_id=f"local-{uuid_module.uuid4()}",
+        platform_name="local",
+        name=data.name,
+        email=data.email,
+        phone=data.phone,
+        website=data.website,
+        address_line1=data.address_line1,
+        address_line2=data.address_line2,
+        city=data.city,
+        postal_code=data.postal_code,
+        country=data.country,
+        contact_type=data.contact_type,
+        industry=data.industry,
+        tax_number=data.tax_number,
+    )
+
+    db.add(client)
+    db.commit()
+    db.refresh(client)
+
+    logger.info(f"Created client {client.id}: {client.name}")
+
+    return {
+        "id": str(client.id),
+        "message": "Client created successfully",
+    }
+
+
+@router.put("/clients/{client_id}")
+def update_client(
+    client_id: UUID,
+    data: ClientUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update an existing client."""
+    client = db.query(Client).filter(Client.id == client_id).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Update fields if provided
+    if data.name is not None:
+        client.name = data.name
+    if data.email is not None:
+        client.email = data.email
+    if data.phone is not None:
+        client.phone = data.phone
+    if data.website is not None:
+        client.website = data.website
+    if data.address_line1 is not None:
+        client.address_line1 = data.address_line1
+    if data.address_line2 is not None:
+        client.address_line2 = data.address_line2
+    if data.city is not None:
+        client.city = data.city
+    if data.postal_code is not None:
+        client.postal_code = data.postal_code
+    if data.country is not None:
+        client.country = data.country
+    if data.contact_type is not None:
+        client.contact_type = data.contact_type
+    if data.industry is not None:
+        client.industry = data.industry
+    if data.tax_number is not None:
+        client.tax_number = data.tax_number
+    if data.is_active is not None:
+        client.is_active = data.is_active
+
+    db.commit()
+    db.refresh(client)
+
+    logger.info(f"Updated client {client.id}: {client.name}")
+
+    return {
+        "id": str(client.id),
+        "message": "Client updated successfully",
+    }
+
+
+@router.delete("/clients/{client_id}")
+def delete_client(
+    client_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete a client (soft delete - sets is_active to False)."""
+    client = db.query(Client).filter(Client.id == client_id).first()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Soft delete - set inactive instead of removing
+    client.is_active = False
+    db.commit()
+
+    logger.info(f"Deleted (deactivated) client {client_id}")
+
+    return {"message": "Client deleted successfully"}
+
+
 # ============================================================================
 # TRANSACTIONS
 # ============================================================================
@@ -291,6 +493,180 @@ def get_transaction(
         "is_reconciled": txn.is_reconciled,
         "created_at": txn.created_at.isoformat() if txn.created_at else None,
     }
+
+
+@router.post("/transactions")
+def create_transaction(
+    data: TransactionCreate,
+    db: Session = Depends(get_db),
+):
+    """Create a new transaction."""
+    # Get organization from request or fall back to first active
+    if data.organization_id:
+        org = db.query(Organization).filter(Organization.id == UUID(data.organization_id)).first()
+    else:
+        org = db.query(Organization).filter(Organization.is_active == True).first()
+
+    if not org:
+        raise HTTPException(status_code=400, detail="No organization found")
+
+    # Create transaction with generated platform_id
+    txn = Transaction(
+        organization_id=org.id,
+        platform_id=f"local-{uuid_module.uuid4()}",
+        platform_name="local",
+        client_id=UUID(data.client_id) if data.client_id else None,
+        account_id=UUID(data.account_id) if data.account_id else None,
+        transaction_type=data.transaction_type,
+        reference_number=data.reference_number,
+        description=data.description,
+        amount=Decimal(str(data.amount)),
+        tax_amount=Decimal(str(data.tax_amount)),
+        total_amount=Decimal(str(data.total_amount)),
+        currency=data.currency,
+        transaction_date=data.transaction_date,
+        due_date=data.due_date,
+        status=data.status,
+    )
+
+    db.add(txn)
+    db.commit()
+    db.refresh(txn)
+
+    logger.info(f"Created transaction {txn.id}")
+
+    return {
+        "id": str(txn.id),
+        "message": "Transaction created successfully",
+    }
+
+
+@router.post("/transactions/bulk-delete")
+def bulk_delete_transactions(
+    data: BulkDeleteRequest,
+    db: Session = Depends(get_db),
+):
+    """Delete multiple transactions."""
+    if not data.ids:
+        raise HTTPException(status_code=400, detail="No transaction IDs provided")
+
+    deleted_count = 0
+    for txn_id in data.ids:
+        try:
+            txn = db.query(Transaction).filter(Transaction.id == UUID(txn_id)).first()
+            if txn:
+                db.delete(txn)
+                deleted_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to delete transaction {txn_id}: {e}")
+
+    db.commit()
+
+    logger.info(f"Bulk deleted {deleted_count} transactions")
+
+    return {
+        "deleted_count": deleted_count,
+        "message": f"Deleted {deleted_count} transactions",
+    }
+
+
+@router.put("/transactions/bulk-status")
+def bulk_update_transaction_status(
+    data: BulkStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update status for multiple transactions."""
+    if not data.ids:
+        raise HTTPException(status_code=400, detail="No transaction IDs provided")
+
+    updated_count = 0
+    for txn_id in data.ids:
+        try:
+            txn = db.query(Transaction).filter(Transaction.id == UUID(txn_id)).first()
+            if txn:
+                txn.status = data.status
+                updated_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to update transaction {txn_id}: {e}")
+
+    db.commit()
+
+    logger.info(f"Bulk updated {updated_count} transactions to status: {data.status}")
+
+    return {
+        "updated_count": updated_count,
+        "message": f"Updated {updated_count} transactions to {data.status}",
+    }
+
+
+@router.put("/transactions/{transaction_id}")
+def update_transaction(
+    transaction_id: UUID,
+    data: TransactionUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update an existing transaction."""
+    txn = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Update fields if provided
+    if data.client_id is not None:
+        txn.client_id = UUID(data.client_id) if data.client_id else None
+    if data.account_id is not None:
+        txn.account_id = UUID(data.account_id) if data.account_id else None
+    if data.transaction_type is not None:
+        txn.transaction_type = data.transaction_type
+    if data.reference_number is not None:
+        txn.reference_number = data.reference_number
+    if data.description is not None:
+        txn.description = data.description
+    if data.amount is not None:
+        txn.amount = Decimal(str(data.amount))
+    if data.tax_amount is not None:
+        txn.tax_amount = Decimal(str(data.tax_amount))
+    if data.total_amount is not None:
+        txn.total_amount = Decimal(str(data.total_amount))
+    if data.currency is not None:
+        txn.currency = data.currency
+    if data.transaction_date is not None:
+        txn.transaction_date = data.transaction_date
+    if data.due_date is not None:
+        txn.due_date = data.due_date
+    if data.status is not None:
+        txn.status = data.status
+    if data.is_reconciled is not None:
+        txn.is_reconciled = data.is_reconciled
+
+    db.commit()
+    db.refresh(txn)
+
+    logger.info(f"Updated transaction {txn.id}")
+
+    return {
+        "id": str(txn.id),
+        "message": "Transaction updated successfully",
+    }
+
+
+@router.delete("/transactions/{transaction_id}")
+def delete_transaction(
+    transaction_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete a transaction."""
+    txn = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    db.delete(txn)
+    db.commit()
+
+    logger.info(f"Deleted transaction {transaction_id}")
+
+    return {"message": "Transaction deleted successfully"}
 
 
 # ============================================================================

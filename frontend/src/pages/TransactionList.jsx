@@ -9,8 +9,6 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '../stores/authStore'
 import { useToastStore } from '../stores/toastStore'
 import { transactionsAPI } from '../services/api'
 import Navigation from '../components/Navigation'
@@ -25,8 +23,6 @@ import { useSortedItems } from '../hooks/useSortedItems'
 const ITEMS_PER_PAGE = 10
 
 export default function TransactionList() {
-  const navigate = useNavigate()
-  const { logout } = useAuthStore()
   const { addToast } = useToastStore()
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -115,11 +111,6 @@ export default function TransactionList() {
 
   const handlePageChange = (page) => setCurrentPage(page)
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
-
   useEffect(() => {
     handleFilterChange()
   }, [search, typeFilter, statusFilter, startDate, endDate])
@@ -146,6 +137,7 @@ export default function TransactionList() {
     setBulkLoading(true)
     try {
       const selected = bulk.getSelectedItems()
+      // Update local state for immediate feedback
       setTransactions((prev) =>
         prev.map((t) => (selected.find((s) => s.id === t.id) ? { ...t, category } : t))
       )
@@ -160,11 +152,28 @@ export default function TransactionList() {
     setBulkLoading(true)
     try {
       const selected = bulk.getSelectedItems()
+      const ids = selected.map((t) => t.id)
+
+      // Map frontend status to backend status
+      const backendStatusMap = {
+        Categorized: 'paid',
+        'Needs Review': 'submitted',
+        Pending: 'draft',
+      }
+      const backendStatus = backendStatusMap[status] || status.toLowerCase()
+
+      // Call backend API
+      await transactionsAPI.bulkUpdateStatus(ids, backendStatus)
+
+      // Update local state
       setTransactions((prev) =>
         prev.map((t) => (selected.find((s) => s.id === t.id) ? { ...t, status } : t))
       )
       bulk.deselectAll()
       addToast(`${selected.length} transactions status updated to ${status}`, 'success')
+    } catch (err) {
+      console.error('Error updating status:', err)
+      addToast('Failed to update transaction status', 'error')
     } finally {
       setBulkLoading(false)
     }
@@ -175,9 +184,18 @@ export default function TransactionList() {
     setBulkLoading(true)
     try {
       const selected = bulk.getSelectedItems()
+      const ids = selected.map((t) => t.id)
+
+      // Call backend API
+      await transactionsAPI.bulkDelete(ids)
+
+      // Update local state
       setTransactions((prev) => prev.filter((t) => !selected.find((s) => s.id === t.id)))
       bulk.deselectAll()
       addToast(`${selected.length} transactions deleted`, 'success')
+    } catch (err) {
+      console.error('Error deleting transactions:', err)
+      addToast('Failed to delete transactions', 'error')
     } finally {
       setBulkLoading(false)
     }
@@ -238,21 +256,13 @@ export default function TransactionList() {
               {totalCount.toLocaleString()} transactions from database
             </p>
           </div>
-          <div className="flex gap-4">
-            <button
-              onClick={handleExport}
-              disabled={filteredTransactions.length === 0}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Export CSV
-            </button>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
-            >
-              Logout
-            </button>
-          </div>
+          <button
+            onClick={handleExport}
+            disabled={filteredTransactions.length === 0}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export CSV
+          </button>
         </div>
       </header>
 

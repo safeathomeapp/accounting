@@ -5,12 +5,14 @@ import { useThemeStore } from './stores/themeStore'
 import ErrorBoundary from './components/ErrorBoundary'
 import Toast from './components/Toast'
 import Login from './pages/Login'
+import Register from './pages/Register'
 import HomePage from './pages/HomePage'
 import ClientDetail from './pages/ClientDetail'
 import Dashboard from './pages/Dashboard'
 import TransactionList from './pages/TransactionList'
 import AccountsList from './pages/AccountsList'
 import SyncMonitor from './pages/SyncMonitor'
+import Settings from './pages/Settings'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore()
@@ -42,6 +44,7 @@ export default function App() {
         <Toast />
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route
             path="/home"
             element={
@@ -87,6 +90,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <SyncMonitor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

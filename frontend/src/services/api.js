@@ -19,12 +19,41 @@ const api = axios.create({
   },
 })
 
-// Add token to requests if it exists
+// Add token and org_id to requests if they exist
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('authToken')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
+  // Add org_id to data requests automatically
+  const dataEndpoints = ['/clients', '/transactions', '/accounts', '/dashboard']
+  const isDataRequest = dataEndpoints.some((endpoint) => config.url?.startsWith(endpoint))
+
+  if (isDataRequest) {
+    try {
+      const userData = localStorage.getItem('authUser')
+      if (userData) {
+        const user = JSON.parse(userData)
+        if (user.organization_id) {
+          // Add to query params for GET requests
+          if (config.method === 'get') {
+            config.params = config.params || {}
+            config.params.org_id = user.organization_id
+          }
+          // Add to body for POST/PUT requests (if body exists)
+          if ((config.method === 'post' || config.method === 'put') && config.data) {
+            const data = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
+            data.organization_id = user.organization_id
+            config.data = data
+          }
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
   return config
 })
 
@@ -46,6 +75,7 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login: (email, password) => api.post('/auth/login', { email, password }),
+  register: (email, password, name) => api.post('/auth/register', { email, password, name }),
   logout: () => localStorage.removeItem('authToken'),
   getProfile: () => api.get('/auth/profile'),
 }
@@ -74,6 +104,9 @@ export const organizationsAPI = {
 export const clientsAPI = {
   list: (params = {}) => api.get('/clients', { params }),
   get: (id) => api.get(`/clients/${id}`),
+  create: (data) => api.post('/clients', data),
+  update: (id, data) => api.put(`/clients/${id}`, data),
+  delete: (id) => api.delete(`/clients/${id}`),
 }
 
 // ============================================================================
@@ -83,6 +116,11 @@ export const clientsAPI = {
 export const transactionsAPI = {
   list: (params = {}) => api.get('/transactions', { params }),
   get: (id) => api.get(`/transactions/${id}`),
+  create: (data) => api.post('/transactions', data),
+  update: (id, data) => api.put(`/transactions/${id}`, data),
+  delete: (id) => api.delete(`/transactions/${id}`),
+  bulkDelete: (ids) => api.post('/transactions/bulk-delete', { ids }),
+  bulkUpdateStatus: (ids, status) => api.put('/transactions/bulk-status', { ids, status }),
 }
 
 // ============================================================================
