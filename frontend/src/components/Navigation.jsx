@@ -5,13 +5,14 @@ export default function Navigation() {
   const location = useLocation()
 
   const isActive = (path) => location.pathname === path
+  const isClientPage = location.pathname.startsWith('/client/')
 
   return (
     <nav className="bg-gray-800 dark:bg-gray-900 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/dashboard" className="flex items-center space-x-2">
+          <Link to="/home" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
               <span className="font-bold text-white">A</span>
             </div>
@@ -20,6 +21,16 @@ export default function Navigation() {
 
           {/* Menu & Toggle */}
           <div className="flex items-center space-x-1">
+            <Link
+              to="/home"
+              className={`px-4 py-2 rounded-lg transition ${
+                isActive('/home') || isClientPage
+                  ? 'bg-blue-600'
+                  : 'hover:bg-gray-700'
+              }`}
+            >
+              Clients
+            </Link>
             <Link
               to="/dashboard"
               className={`px-4 py-2 rounded-lg transition ${
@@ -58,7 +69,7 @@ export default function Navigation() {
                   : 'hover:bg-gray-700'
               }`}
             >
-              Sync Monitor
+              Sync
             </Link>
             <DarkModeToggle />
           </div>

@@ -5,6 +5,8 @@ import { useThemeStore } from './stores/themeStore'
 import ErrorBoundary from './components/ErrorBoundary'
 import Toast from './components/Toast'
 import Login from './pages/Login'
+import HomePage from './pages/HomePage'
+import ClientDetail from './pages/ClientDetail'
 import Dashboard from './pages/Dashboard'
 import TransactionList from './pages/TransactionList'
 import AccountsList from './pages/AccountsList'
@@ -41,6 +43,22 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
+            path="/home"
+            element={
+              <ProtectedRoute>
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/client/:clientId"
+            element={
+              <ProtectedRoute>
+                <ClientDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
@@ -72,8 +90,8 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
-          <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
+          <Route path="/" element={<Navigate to={isAuthenticated ? "/home" : "/login"} replace />} />
+          <Route path="*" element={<Navigate to={isAuthenticated ? "/home" : "/login"} replace />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>

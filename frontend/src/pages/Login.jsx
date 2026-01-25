@@ -21,7 +21,7 @@ export default function Login() {
     const success = await login(email, password)
     if (success) {
       addToast('Login successful!', 'success')
-      navigate('/dashboard')
+      navigate('/home')
     }
   }
 
