@@ -247,6 +247,7 @@ def get_client(
     return {
         "id": str(client.id),
         "organization_id": str(client.organization_id),
+        "platform_name": client.platform_name,
         "name": client.name,
         "email": client.email,
         "phone": client.phone,
@@ -677,15 +678,19 @@ def delete_transaction(
 def list_accounts(
     db: Session = Depends(get_db),
     org_id: Optional[UUID] = None,
+    client_id: Optional[UUID] = None,
     account_type: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
-    """List accounts with optional filtering."""
+    """List accounts with optional filtering by organization, client, or type."""
     query = db.query(Account).filter(Account.is_active == True)
 
     if org_id:
         query = query.filter(Account.organization_id == org_id)
+
+    if client_id:
+        query = query.filter(Account.client_id == client_id)
 
     if account_type:
         query = query.filter(Account.account_type == account_type)
@@ -702,9 +707,73 @@ def list_accounts(
                 "account_type": a.account_type,
                 "description": a.description,
                 "is_active": a.is_active,
+                "client_id": str(a.client_id) if a.client_id else None,
+                "platform_name": a.platform_name,
             }
             for a in accounts
         ],
+        "count": len(accounts),
+        "total": total,
+    }
+
+
+@router.get("/clients/{client_id}/accounts")
+def list_client_accounts(
+    client_id: UUID,
+    db: Session = Depends(get_db),
+    account_type: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=500),
+):
+    """List all accounts for a specific client (their chart of accounts)."""
+    # Verify client exists
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    query = db.query(Account).filter(
+        Account.client_id == client_id,
+        Account.is_active == True
+    )
+
+    if account_type:
+        query = query.filter(Account.account_type == account_type)
+
+    total = query.count()
+    accounts = query.order_by(Account.code).offset(skip).limit(limit).all()
+
+    # Group accounts by type for easier frontend display
+    accounts_by_type = {}
+    for a in accounts:
+        acc_type = a.account_type or "other"
+        if acc_type not in accounts_by_type:
+            accounts_by_type[acc_type] = []
+        accounts_by_type[acc_type].append({
+            "id": str(a.id),
+            "code": a.code,
+            "name": a.name,
+            "account_type": a.account_type,
+            "description": a.description,
+        })
+
+    return {
+        "client": {
+            "id": str(client.id),
+            "name": client.name,
+            "platform_name": client.platform_name,
+        },
+        "accounts": [
+            {
+                "id": str(a.id),
+                "code": a.code,
+                "name": a.name,
+                "account_type": a.account_type,
+                "description": a.description,
+                "is_active": a.is_active,
+            }
+            for a in accounts
+        ],
+        "accounts_by_type": accounts_by_type,
         "count": len(accounts),
         "total": total,
     }
@@ -724,10 +793,13 @@ def get_account(
     return {
         "id": str(account.id),
         "organization_id": str(account.organization_id),
+        "client_id": str(account.client_id) if account.client_id else None,
+        "client_name": account.client.name if account.client else None,
         "code": account.code,
         "name": account.name,
         "account_type": account.account_type,
         "description": account.description,
+        "platform_name": account.platform_name,
         "is_active": account.is_active,
         "created_at": account.created_at.isoformat() if account.created_at else None,
     }

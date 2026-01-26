@@ -81,6 +81,18 @@ export const authAPI = {
 }
 
 // ============================================================================
+// USERS API (User Management)
+// ============================================================================
+
+export const usersAPI = {
+  list: () => api.get('/auth/users'),
+  getRoles: () => api.get('/auth/roles'),
+  invite: (data) => api.post('/auth/users', data),
+  updateRole: (userId, role) => api.put(`/auth/users/${userId}`, { role }),
+  remove: (userId) => api.delete(`/auth/users/${userId}`),
+}
+
+// ============================================================================
 // DASHBOARD API
 // ============================================================================
 
@@ -107,6 +119,7 @@ export const clientsAPI = {
   create: (data) => api.post('/clients', data),
   update: (id, data) => api.put(`/clients/${id}`, data),
   delete: (id) => api.delete(`/clients/${id}`),
+  getAccounts: (clientId, params = {}) => api.get(`/clients/${clientId}/accounts`, { params }),
 }
 
 // ============================================================================

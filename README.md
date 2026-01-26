@@ -48,18 +48,19 @@
 
 ---
 
-## Current State (January 24, 2026)
+## Current State (January 26, 2026)
 
-### You Are Here: Month 6, Phase 3 Complete - Preparing for Phase 4
+### You Are Here: Month 6, Phase 4C In Progress
 
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Backend | ✅ Complete | 903/903 tests passing |
-| Frontend | ✅ Phase 3 Complete | Full web interface ready |
+| Frontend | ✅ Phase 4C In Progress | Connected to PostgreSQL |
 | Database Schema | ✅ Hardened | Phase 4A complete (Jan 24, 2026) |
 | Platform Adapters | ✅ Xero + QuickBooks | FreeAgent docs ready |
-| Dark Mode | ✅ Fixed | Verified Jan 22, 2026 |
-| Mock Data | ✅ Expanded | 25 transactions for testing |
+| Multi-Tenant Auth | ✅ Complete | JWT + Registration + Org scoping |
+| Client Hub | ✅ Complete | HomePage + ClientDetail pages |
+| Real Data | ✅ Complete | 500 transactions via seed script |
 
 ### Completed Features
 - ✅ Multi-platform sync (Xero + QuickBooks)
@@ -71,18 +72,22 @@
 - ✅ Background job scheduling
 - ✅ Real-time monitoring
 - ✅ Web Frontend (React + Vite + TailwindCSS)
-- ✅ User authentication flow (JWT)
+- ✅ User authentication flow (JWT with registration)
 - ✅ Dashboard with dark mode
 - ✅ Transaction management (list, sort, filter, bulk ops)
 - ✅ Account/Sync monitoring pages
 - ✅ Error handling & notifications
 - ✅ Pagination & data export (CSV)
 - ✅ Responsive design (mobile-ready)
+- ✅ **Multi-tenant architecture** (org_id scoping on all data)
+- ✅ **Client-centric navigation** (HomePage grid + ClientDetail hub)
+- ✅ **Real PostgreSQL integration** (frontend connected to live DB)
+- ✅ **User registration flow** (2-step with email verification)
 
 ### In Progress
-- 📝 FreeAgent platform documentation (API Guide + Blueprint complete)
-- ⏳ Awaiting FreeAgent sandbox API access
-- 📋 Database hardening planning (this document)
+- 🔄 Phase 4C: Backend Integration (~70% complete)
+- ⏳ FreeAgent platform adapter (docs complete, awaiting API sandbox)
+- 📋 CRUD UI forms (create/edit dialogs needed)
 
 ---
 
@@ -203,20 +208,22 @@ WHERE total_amount != amount + tax_amount;
 
 ---
 
-### Phase 4C: Backend Integration
+### Phase 4C: Backend Integration (~70% Complete)
 **Goal**: Connect frontend to real PostgreSQL database
-**Status**: Pending (after 4A and 4B)
+**Status**: In Progress (January 26, 2026)
 
 #### Checklist
-- [ ] Database hardening complete (Phase 4A)
-- [ ] At least one new platform adapter complete (Phase 4B)
-- [ ] Connect frontend to PostgreSQL backend
-- [ ] Real user authentication (not demo)
-- [ ] Data persistence across sessions
-- [ ] Real-time sync monitoring
-- [ ] Role-based access control
-- [ ] Audit logging verification
-- [ ] Performance optimization
+- [x] Database hardening complete (Phase 4A) - Jan 24, 2026
+- [ ] At least one new platform adapter complete (Phase 4B) - Blocked on FreeAgent API
+- [x] Connect frontend to PostgreSQL backend - Jan 24, 2026
+- [x] Real user authentication (not demo) - JWT + Registration implemented
+- [x] Data persistence across sessions - localStorage + PostgreSQL
+- [x] Real-time sync monitoring - SyncMonitor page working
+- [ ] Role-based access control - User.is_admin exists, UI not enforced
+- [ ] Audit logging verification - Backend ready, needs testing
+- [ ] Performance optimization - Not started
+- [ ] CRUD UI forms (create/edit dialogs) - Not started
+- [ ] Real OAuth for Xero/QuickBooks - Currently demo mode
 
 ---
 
@@ -455,6 +462,6 @@ When ending a session, create:
 
 ---
 
-**Last Updated**: January 24, 2026
-**Updated By**: Claude Code session - Database hardening integration
-**Next Priority**: Phase 4A - Database Hardening (CRITICAL)
+**Last Updated**: January 26, 2026
+**Updated By**: Claude Code session - Codebase audit and documentation update
+**Next Priority**: Complete Phase 4C remaining items (CRUD UI, Role-based access, Performance)

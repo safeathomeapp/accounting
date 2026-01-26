@@ -67,6 +67,10 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
 
+    # Role-based access control
+    # Roles: admin, manager, accountant, viewer
+    role = Column(String(50), default="viewer", nullable=False)
+
     # Timestamps
     created_at = Column(
         DateTime(timezone=True),

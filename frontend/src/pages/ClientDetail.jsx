@@ -14,10 +14,13 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { clientsAPI, transactionsAPI, accountsAPI } from '../services/api'
+import { clientsAPI, transactionsAPI } from '../services/api'
 import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
 import { SkeletonCard } from '../components/Skeleton'
+import { useSortedItems } from '../hooks/useSortedItems'
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 export default function ClientDetail() {
   const { clientId } = useParams()
@@ -30,6 +33,13 @@ export default function ClientDetail() {
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('transactions')
 
+  // Transaction filters and pagination
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+
   useEffect(() => {
     fetchClientData()
   }, [clientId])
@@ -39,15 +49,17 @@ export default function ClientDetail() {
       setLoading(true)
       setError(null)
 
-      // Fetch client details, transactions, and accounts in parallel
-      const [clientRes, transactionsRes, accountsRes] = await Promise.all([
+      // Fetch client details and transactions first
+      const [clientRes, transactionsRes] = await Promise.all([
         clientsAPI.get(clientId),
         transactionsAPI.list({ client_id: clientId, limit: 100 }),
-        accountsAPI.list({ limit: 100 }),
       ])
 
       setClient(clientRes.data)
       setTransactions(transactionsRes.data.transactions || [])
+
+      // Fetch client-specific accounts
+      const accountsRes = await clientsAPI.getAccounts(clientId)
       setAccounts(accountsRes.data.accounts || [])
     } catch (err) {
       console.error('Error fetching client data:', err)
@@ -73,6 +85,36 @@ export default function ClientDetail() {
     pendingCount: transactions.filter(t => ['draft', 'submitted'].includes(t.status)).length,
     paidCount: transactions.filter(t => t.status === 'paid').length,
   }
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter((t) => {
+    const matchesSearch =
+      !search ||
+      (t.description && t.description.toLowerCase().includes(search.toLowerCase())) ||
+      (t.reference_number && t.reference_number.toLowerCase().includes(search.toLowerCase()))
+    const matchesType = !typeFilter || t.transaction_type === typeFilter
+    const matchesStatus = !statusFilter || t.status === statusFilter
+    return matchesSearch && matchesType && matchesStatus
+  })
+
+  // Sorting
+  const sort = useSortedItems(filteredTransactions)
+  const sortedTransactions = sort.getSorted()
+
+  // Pagination
+  const totalPages = Math.ceil(sortedTransactions.length / itemsPerPage)
+  const paginatedTransactions = sortedTransactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, typeFilter, statusFilter, itemsPerPage])
+
+  // Get unique statuses for filter dropdown
+  const uniqueStatuses = [...new Set(transactions.map(t => t.status).filter(Boolean))]
 
   // Mock pending actions - will be populated by AI
   const pendingActions = [
@@ -272,56 +314,222 @@ export default function ClientDetail() {
                         </button>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              <th className="pb-3">Type</th>
-                              <th className="pb-3">Reference</th>
-                              <th className="pb-3">Date</th>
-                              <th className="pb-3">Due Date</th>
-                              <th className="pb-3 text-right">Amount</th>
-                              <th className="pb-3">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                            {transactions.map((txn) => (
-                              <tr key={txn.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                <td className="py-3">
-                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                    txn.transaction_type === 'invoice'
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                                  }`}>
-                                    {txn.transaction_type === 'invoice' ? 'Invoice' : 'Bill'}
-                                  </span>
-                                </td>
-                                <td className="py-3 font-medium text-gray-900 dark:text-white">
-                                  {txn.reference_number || '-'}
-                                </td>
-                                <td className="py-3 text-gray-600 dark:text-gray-400">
-                                  {txn.transaction_date ? new Date(txn.transaction_date).toLocaleDateString() : '-'}
-                                </td>
-                                <td className="py-3 text-gray-600 dark:text-gray-400">
-                                  {txn.due_date ? new Date(txn.due_date).toLocaleDateString() : '-'}
-                                </td>
-                                <td className="py-3 text-right font-medium text-gray-900 dark:text-white pr-4">
-                                  £{(txn.total_amount || 0).toFixed(2)}
-                                </td>
-                                <td className="py-3 pl-2">
-                                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                    txn.status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                                    txn.status === 'overdue' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
-                                    txn.status === 'submitted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-                                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                                  }`}>
-                                    {txn.status}
-                                  </span>
-                                </td>
-                              </tr>
+                      <div>
+                        {/* Filters Row */}
+                        <div className="flex flex-wrap gap-4 mb-4">
+                          {/* Search */}
+                          <div className="flex-1 min-w-[200px]">
+                            <input
+                              type="text"
+                              value={search}
+                              onChange={(e) => setSearch(e.target.value)}
+                              placeholder="Search description, reference..."
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          {/* Type Filter */}
+                          <select
+                            value={typeFilter}
+                            onChange={(e) => setTypeFilter(e.target.value)}
+                            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          >
+                            <option value="">All Types</option>
+                            <option value="invoice">Invoice</option>
+                            <option value="bill">Bill</option>
+                          </select>
+                          {/* Status Filter */}
+                          <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          >
+                            <option value="">All Statuses</option>
+                            {uniqueStatuses.map((status) => (
+                              <option key={status} value={status}>
+                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                              </option>
                             ))}
-                          </tbody>
-                        </table>
+                          </select>
+                          {/* Clear Filters */}
+                          {(search || typeFilter || statusFilter) && (
+                            <button
+                              onClick={() => {
+                                setSearch('')
+                                setTypeFilter('')
+                                setStatusFilter('')
+                              }}
+                              className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Results info */}
+                        <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                          Showing {paginatedTransactions.length} of {filteredTransactions.length} transactions
+                          {filteredTransactions.length !== transactions.length && ` (filtered from ${transactions.length})`}
+                        </div>
+
+                        {/* Table */}
+                        {filteredTransactions.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                            No transactions match your filters
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                  <th
+                                    className="pb-3 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                                    onClick={() => sort.toggleSort('transaction_type')}
+                                  >
+                                    Type {sort.getSortIndicator('transaction_type')}
+                                  </th>
+                                  <th
+                                    className="pb-3 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                                    onClick={() => sort.toggleSort('reference_number')}
+                                  >
+                                    Reference {sort.getSortIndicator('reference_number')}
+                                  </th>
+                                  <th
+                                    className="pb-3 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                                    onClick={() => sort.toggleSort('transaction_date')}
+                                  >
+                                    Date {sort.getSortIndicator('transaction_date')}
+                                  </th>
+                                  <th
+                                    className="pb-3 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                                    onClick={() => sort.toggleSort('due_date')}
+                                  >
+                                    Due Date {sort.getSortIndicator('due_date')}
+                                  </th>
+                                  <th
+                                    className="pb-3 text-right cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                                    onClick={() => sort.toggleSort('total_amount')}
+                                  >
+                                    Amount {sort.getSortIndicator('total_amount')}
+                                  </th>
+                                  <th
+                                    className="pb-3 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                                    onClick={() => sort.toggleSort('status')}
+                                  >
+                                    Status {sort.getSortIndicator('status')}
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {paginatedTransactions.map((txn) => (
+                                  <tr key={txn.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <td className="py-3">
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                        txn.transaction_type === 'invoice'
+                                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                                      }`}>
+                                        {txn.transaction_type === 'invoice' ? 'Invoice' : 'Bill'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 font-medium text-gray-900 dark:text-white">
+                                      {txn.reference_number || '-'}
+                                    </td>
+                                    <td className="py-3 text-gray-600 dark:text-gray-400">
+                                      {txn.transaction_date ? new Date(txn.transaction_date).toLocaleDateString() : '-'}
+                                    </td>
+                                    <td className="py-3 text-gray-600 dark:text-gray-400">
+                                      {txn.due_date ? new Date(txn.due_date).toLocaleDateString() : '-'}
+                                    </td>
+                                    <td className="py-3 text-right font-medium text-gray-900 dark:text-white pr-4">
+                                      £{(txn.total_amount || 0).toFixed(2)}
+                                    </td>
+                                    <td className="py-3 pl-2">
+                                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                        txn.status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+                                        txn.status === 'overdue' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
+                                        txn.status === 'submitted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
+                                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                      }`}>
+                                        {txn.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Pagination Footer */}
+                        {filteredTransactions.length > 0 && (
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            {/* Page Size Selector */}
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                              <span>Show</span>
+                              <select
+                                value={itemsPerPage}
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              >
+                                {PAGE_SIZE_OPTIONS.map((size) => (
+                                  <option key={size} value={size}>
+                                    {size}
+                                  </option>
+                                ))}
+                              </select>
+                              <span>per page</span>
+                            </div>
+
+                            {/* Pagination Controls */}
+                            {totalPages > 1 && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setCurrentPage(1)}
+                                  disabled={currentPage === 1}
+                                  className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="First page"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7m0 0l7-7m-7 7h18" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                  disabled={currentPage === 1}
+                                  className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Previous page"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                </button>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 px-2">
+                                  Page {currentPage} of {totalPages}
+                                </span>
+                                <button
+                                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                  disabled={currentPage === totalPages}
+                                  className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Next page"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => setCurrentPage(totalPages)}
+                                  disabled={currentPage === totalPages}
+                                  className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Last page"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -336,36 +544,72 @@ export default function ClientDetail() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                         </svg>
                         <p className="text-gray-500 dark:text-gray-400 mb-4">No accounts linked</p>
-                        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
-                          Link Account
-                        </button>
+                        <p className="text-sm text-gray-400 dark:text-gray-500">
+                          Sync with the client's accounting software to import their chart of accounts
+                        </p>
                       </div>
                     ) : (
-                      <div className="grid gap-4">
-                        {accounts.map((account) => (
-                          <div key={account.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                                <span className="text-blue-600 dark:text-blue-400 font-bold text-sm">
-                                  {account.code?.slice(0, 2) || 'AC'}
+                      <div>
+                        {/* Header with account count and platform info */}
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {accounts.length} accounts from {client?.platform_name || 'accounting software'}
+                          </div>
+                        </div>
+
+                        {/* Group accounts by type */}
+                        {['asset', 'bank', 'liability', 'equity', 'income', 'expense'].map((type) => {
+                          const typeAccounts = accounts.filter((a) => a.account_type === type)
+                          if (typeAccounts.length === 0) return null
+
+                          const typeColors = {
+                            asset: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+                            bank: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+                            liability: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+                            equity: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+                            income: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+                            expense: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+                          }
+
+                          return (
+                            <div key={type} className="mb-6">
+                              <div className="flex items-center gap-2 mb-3">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                  {type}
+                                </h4>
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeColors[type]}`}>
+                                  {typeAccounts.length}
                                 </span>
                               </div>
-                              <div>
-                                <div className="font-medium text-gray-900 dark:text-white">{account.name}</div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                  {account.code} • {account.account_type}
-                                </div>
+                              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg overflow-hidden">
+                                <table className="w-full">
+                                  <thead>
+                                    <tr className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                      <th className="text-left py-2 px-4 font-medium">Code</th>
+                                      <th className="text-left py-2 px-4 font-medium">Name</th>
+                                      <th className="text-left py-2 px-4 font-medium hidden md:table-cell">Description</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                                    {typeAccounts.map((account) => (
+                                      <tr key={account.id} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                                        <td className="py-2 px-4 font-mono text-sm text-gray-900 dark:text-white">
+                                          {account.code}
+                                        </td>
+                                        <td className="py-2 px-4 text-sm text-gray-900 dark:text-white">
+                                          {account.name}
+                                        </td>
+                                        <td className="py-2 px-4 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">
+                                          {account.description || '-'}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
                               </div>
                             </div>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              account.is_active
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                            }`}>
-                              {account.is_active ? 'Active' : 'Inactive'}
-                            </span>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>

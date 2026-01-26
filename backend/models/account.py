@@ -94,6 +94,15 @@ class Account(Base):
         index=True
     )
 
+    # Client-specific accounts - each client has their own chart of accounts
+    # pulled from their accounting software (Xero, QuickBooks, etc.)
+    client_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=True,  # Nullable during migration, should be required for new accounts
+        index=True
+    )
+
     # Platform Reference
     platform_id = Column(String(500), nullable=False)
     platform_name = Column(String(50), nullable=False, index=True)
@@ -130,15 +139,20 @@ class Account(Base):
         back_populates="accounts",
         lazy="select"
     )
+    client = relationship(
+        "Client",
+        back_populates="accounts",
+        lazy="select"
+    )
     transactions = relationship(
         "Transaction",
         back_populates="account",
         lazy="select"
     )
 
-    # Unique constraint: code per organization
+    # Unique constraint: code per client (each client has their own chart of accounts)
     __table_args__ = (
-        Index("ix_accounts_org_code", "organization_id", "code", unique=True),
+        Index("ix_accounts_client_code", "client_id", "code", unique=True),
     )
 
     def __repr__(self) -> str:
