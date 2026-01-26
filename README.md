@@ -112,7 +112,10 @@ What should be the focus for the next phase of work?
 | **F. Performance** | Query optimization, caching, load testing | Medium |
 
 ### Subcontractor Reports to Review
-Documents uploaded to `/docs/` from subcontractor regarding client/end-user reporting.
+Documents uploaded to `/docs/read me next/` from subcontractor:
+- `Canonical_Data_Mapping_and_Reporting_Conformity_v1.md`
+- `Engineering_and_Data_Rules_of_the_Road.md`
+
 **Action**: Review these documents at session start for potential integration into roadmap.
 
 ### Phase 4C Completion Criteria
