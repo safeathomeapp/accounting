@@ -4,6 +4,26 @@
 
 ---
 
+## 🚨 START HERE - Session Entry Point
+
+**This section is updated each session. Follow these steps before doing ANY work:**
+
+### Current Session Instructions (January 26, 2026)
+
+1. **Read this entire README** - Understand current state and rules
+2. **Review pending documents** in `/docs/READ ME NEXT/`:
+   - `Canonical_Data_Mapping_and_Reporting_Conformity_v1.md`
+   - `Engineering_and_Data_Rules_of_the_Road.md`
+3. **Discuss priorities with user** before starting work - see "NEXT SESSION: Discussion Required" section below
+4. **Update this section** at end of session with next session's instructions
+
+### Session Workflow
+```
+START → Read README → Review pending docs → Discuss priorities → Do work → Update README → Create session notes → END
+```
+
+---
+
 ## NON-EDITABLE RULES FOR CLAUDE-CODE
 
 **These rules are MANDATORY and must be followed on every session:**
