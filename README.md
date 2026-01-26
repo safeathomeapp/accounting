@@ -112,7 +112,7 @@ What should be the focus for the next phase of work?
 | **F. Performance** | Query optimization, caching, load testing | Medium |
 
 ### Subcontractor Reports to Review
-Documents uploaded to `/docs/read me next/` from subcontractor:
+Documents uploaded to `/docs/READ ME NEXT/` from subcontractor:
 - `Canonical_Data_Mapping_and_Reporting_Conformity_v1.md`
 - `Engineering_and_Data_Rules_of_the_Road.md`
 
