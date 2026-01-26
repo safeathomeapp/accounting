@@ -83,11 +83,44 @@
 - ✅ **Client-centric navigation** (HomePage grid + ClientDetail hub)
 - ✅ **Real PostgreSQL integration** (frontend connected to live DB)
 - ✅ **User registration flow** (2-step with email verification)
+- ✅ **Client-specific nominal accounts** (156 industry-specific accounts across 5 clients) *(Jan 26)*
+- ✅ **User role management (RBAC)** (Admin/Manager/Accountant/Viewer roles) *(Jan 26)*
+- ✅ **Settings page redesign** (User management, Access Levels, Integrations tabs) *(Jan 26)*
 
 ### In Progress
-- 🔄 Phase 4C: Backend Integration (~70% complete)
+- 🔄 Phase 4C: Backend Integration (~85% complete)
 - ⏳ FreeAgent platform adapter (docs complete, awaiting API sandbox)
 - 📋 CRUD UI forms (create/edit dialogs needed)
+- 📋 Client/End-user reporting (subcontractor docs pending review)
+
+---
+
+## ⚠️ NEXT SESSION: Discussion Required
+
+**Review before starting work.** The following decisions need to be made:
+
+### Priority Decision Needed
+What should be the focus for the next phase of work?
+
+| Option | Description | Effort |
+|--------|-------------|--------|
+| **A. CRUD UI Forms** | Create/edit dialogs for transactions, clients, accounts | Medium |
+| **B. Real OAuth** | Replace demo OAuth with real Xero/QuickBooks integration | Medium |
+| **C. Client Reporting** | Review subcontractor docs and implement end-user reports | TBD |
+| **D. Documents Tab** | Implement document upload/management in ClientDetail | Medium |
+| **E. Phase 5 (RLS)** | Row-Level Security for production hardening | High |
+| **F. Performance** | Query optimization, caching, load testing | Medium |
+
+### Subcontractor Reports to Review
+Documents uploaded to `/docs/` from subcontractor regarding client/end-user reporting.
+**Action**: Review these documents at session start for potential integration into roadmap.
+
+### Phase 4C Completion Criteria
+What defines "complete" for Phase 4C before moving to Phase 5?
+- [ ] CRUD UI forms?
+- [ ] Real OAuth?
+- [ ] Client reporting?
+- [ ] All of the above?
 
 ---
 
@@ -462,6 +495,6 @@ When ending a session, create:
 
 ---
 
-**Last Updated**: January 26, 2026
-**Updated By**: Claude Code session - Codebase audit and documentation update
-**Next Priority**: Complete Phase 4C remaining items (CRUD UI, Role-based access, Performance)
+**Last Updated**: January 26, 2026 (Session 2)
+**Updated By**: Claude Code - Added client-specific accounts, RBAC, Settings redesign
+**Next Priority**: ⚠️ DISCUSSION REQUIRED - See "Next Session" section above. Subcontractor reports to review.
