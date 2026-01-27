@@ -1,9 +1,13 @@
-"""Financial report generation engine."""
+"""Financial report generation engine.
+
+Reads from the canonical cashflow_facts_v1 layer for normalized, platform-agnostic
+reporting. Falls back to raw transactions if no facts exist (graceful degradation).
+"""
 
 import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from sqlalchemy import func
@@ -16,6 +20,8 @@ from backend.models import (
     Client,
 )
 from backend.accounting import TransactionType, AccountType
+from backend.canonical.models import CashflowFact, CashflowBucket, NormalizedTxnType
+from backend.canonical import queries as canonical_queries
 from .models import (
     ProfitLossReport,
     BalanceSheet,
@@ -26,26 +32,27 @@ logger = logging.getLogger(__name__)
 
 
 class ReportGenerator:
-    """Generate financial reports from synced accounting data."""
+    """Generate financial reports from canonical facts layer."""
 
     def __init__(self, db: Session, organization_id: UUID):
-        """
-        Initialize report generator.
-
-        Args:
-            db: Database session
-            organization_id: Organization UUID
-        """
         self.db = db
         self.organization_id = organization_id
 
-        # Verify organization exists
         self.org = self.db.query(Organization).filter_by(
             id=organization_id
         ).first()
 
         if not self.org:
             raise ValueError(f"Organization not found: {organization_id}")
+
+    def _has_facts(self) -> bool:
+        """Check if canonical facts exist for this organization."""
+        count = (
+            self.db.query(func.count(CashflowFact.id))
+            .filter(CashflowFact.organization_id == self.organization_id)
+            .scalar()
+        )
+        return (count or 0) > 0
 
     def get_transactions(
         self,
@@ -54,18 +61,7 @@ class ReportGenerator:
         account_ids: Optional[List[str]] = None,
         transaction_types: Optional[List[str]] = None,
     ) -> List[Transaction]:
-        """
-        Get transactions for date range.
-
-        Args:
-            start_date: Start date
-            end_date: End date
-            account_ids: Optional filter by account IDs
-            transaction_types: Optional filter by transaction types
-
-        Returns:
-            List of transactions
-        """
+        """Get raw transactions for date range (fallback path)."""
         query = self.db.query(Transaction).filter(
             Transaction.organization_id == self.organization_id,
             Transaction.transaction_date >= start_date,
@@ -84,26 +80,13 @@ class ReportGenerator:
         self,
         start_date: date,
         end_date: date,
+        account_ids: Optional[List[str]] = None,
     ) -> ProfitLossReport:
         """
         Generate Profit & Loss statement.
 
-        Algorithm:
-        1. Sum revenue from INCOME type accounts
-        2. Sum cost of goods sold from COGS accounts
-        3. Sum operating expenses from EXPENSE accounts
-        4. Calculate gross profit = Revenue - COGS
-        5. Calculate operating income = Gross profit - Operating expenses
-        6. Add/subtract other income and expenses
-        7. Apply taxes
-        8. Calculate net income
-
-        Args:
-            start_date: Start date for report
-            end_date: End date for report
-
-        Returns:
-            ProfitLossReport with calculated values
+        Uses canonical facts layer when available, falls back to raw transactions.
+        Response shape is identical regardless of data source.
         """
         logger.info(
             f"Generating P&L report for {self.organization_id} "
@@ -116,39 +99,46 @@ class ReportGenerator:
             organization_id=self.organization_id,
         )
 
-        # Get all revenue accounts
-        revenue_accounts = self.db.query(Account).filter(
-            Account.organization_id == self.organization_id,
-            Account.account_type == AccountType.INCOME,
-        ).all()
-
-        revenue_account_ids = [acc.id for acc in revenue_accounts]
-
-        if revenue_account_ids:
-            revenue_txns = self.get_transactions(
-                start_date, end_date, account_ids=revenue_account_ids
+        if self._has_facts():
+            # Canonical facts path
+            report.revenue = canonical_queries.get_revenue(
+                self.db, self.organization_id, start_date, end_date
             )
-            report.revenue = sum(
-                (t.total_amount for t in revenue_txns), Decimal("0.00")
+            report.operating_expenses = canonical_queries.get_expenses(
+                self.db, self.organization_id, start_date, end_date
             )
+            logger.debug("P&L generated from canonical facts")
+        else:
+            # Fallback: raw transactions path
+            revenue_accounts = self.db.query(Account).filter(
+                Account.organization_id == self.organization_id,
+                Account.account_type == AccountType.INCOME,
+            ).all()
 
-        # Get expense accounts
-        expense_accounts = self.db.query(Account).filter(
-            Account.organization_id == self.organization_id,
-            Account.account_type == AccountType.EXPENSE,
-        ).all()
+            revenue_account_ids = [acc.id for acc in revenue_accounts]
+            if revenue_account_ids:
+                revenue_txns = self.get_transactions(
+                    start_date, end_date, account_ids=revenue_account_ids
+                )
+                report.revenue = sum(
+                    (t.total_amount for t in revenue_txns), Decimal("0.00")
+                )
 
-        expense_account_ids = [acc.id for acc in expense_accounts]
+            expense_accounts = self.db.query(Account).filter(
+                Account.organization_id == self.organization_id,
+                Account.account_type == AccountType.EXPENSE,
+            ).all()
 
-        if expense_account_ids:
-            expense_txns = self.get_transactions(
-                start_date, end_date, account_ids=expense_account_ids
-            )
-            report.operating_expenses = sum(
-                (t.total_amount for t in expense_txns), Decimal("0.00")
-            )
+            expense_account_ids = [acc.id for acc in expense_accounts]
+            if expense_account_ids:
+                expense_txns = self.get_transactions(
+                    start_date, end_date, account_ids=expense_account_ids
+                )
+                report.operating_expenses = sum(
+                    (t.total_amount for t in expense_txns), Decimal("0.00")
+                )
+            logger.debug("P&L generated from raw transactions (no facts available)")
 
-        # Calculate totals
         report.calculate_totals()
 
         logger.info(
@@ -162,21 +152,13 @@ class ReportGenerator:
     def generate_balance_sheet(
         self,
         as_of_date: Optional[date] = None,
+        account_ids: Optional[List[str]] = None,
     ) -> BalanceSheet:
         """
         Generate Balance Sheet as of date.
 
-        Algorithm:
-        1. Get all ASSET type accounts and sum balances
-        2. Get all LIABILITY type accounts and sum balances
-        3. Get all EQUITY type accounts and sum balances
-        4. Verify: Total Assets = Total Liabilities + Total Equity
-
-        Args:
-            as_of_date: Date for balance sheet (default: today)
-
-        Returns:
-            BalanceSheet with account balances
+        Uses canonical facts for AR/AP aging when available,
+        falls back to raw account-based calculation.
         """
         if as_of_date is None:
             as_of_date = date.today()
@@ -190,41 +172,68 @@ class ReportGenerator:
             organization_id=self.organization_id,
         )
 
-        # Get all accounts for this organization
-        accounts = self.db.query(Account).filter(
-            Account.organization_id == self.organization_id
-        ).all()
+        if self._has_facts():
+            # Use canonical facts for AR/AP portions
+            ar_data = canonical_queries.get_ar_aging(self.db, self.organization_id)
+            ap_data = canonical_queries.get_ap_aging(self.db, self.organization_id)
 
-        # Group accounts by type and calculate balances
-        for account in accounts:
-            # Get transactions up to and including as_of_date
-            txns = self.db.query(Transaction).filter(
-                Transaction.account_id == account.id,
-                Transaction.transaction_date <= as_of_date,
+            report.current_assets = ar_data["ar_total"]
+            report.current_liabilities = ap_data["ap_total"]
+
+            # Still need account-based data for equity and other accounts
+            accounts = self.db.query(Account).filter(
+                Account.organization_id == self.organization_id
             ).all()
 
-            balance = sum((t.total_amount for t in txns), Decimal("0.00"))
+            for account in accounts:
+                if account.account_type == AccountType.EQUITY:
+                    txns = self.db.query(Transaction).filter(
+                        Transaction.account_id == account.id,
+                        Transaction.transaction_date <= as_of_date,
+                    ).all()
+                    balance = sum((t.total_amount for t in txns), Decimal("0.00"))
+                    report.total_equity += balance
+                    report.equity_by_account.append({
+                        "account_id": str(account.id),
+                        "account_name": account.name,
+                        "account_code": account.code,
+                        "balance": float(balance),
+                    })
 
-            account_info = {
-                "account_id": str(account.id),
-                "account_name": account.name,
-                "account_code": account.code,
-                "balance": float(balance),
-            }
+            logger.debug("Balance sheet generated from canonical facts + accounts")
+        else:
+            # Fallback: pure account-based calculation
+            accounts = self.db.query(Account).filter(
+                Account.organization_id == self.organization_id
+            ).all()
 
-            if account.account_type == AccountType.ASSET:
-                report.current_assets += balance
-                report.assets_by_account.append(account_info)
+            for account in accounts:
+                txns = self.db.query(Transaction).filter(
+                    Transaction.account_id == account.id,
+                    Transaction.transaction_date <= as_of_date,
+                ).all()
 
-            elif account.account_type == AccountType.LIABILITY:
-                report.current_liabilities += balance
-                report.liabilities_by_account.append(account_info)
+                balance = sum((t.total_amount for t in txns), Decimal("0.00"))
 
-            elif account.account_type == AccountType.EQUITY:
-                report.total_equity += balance
-                report.equity_by_account.append(account_info)
+                account_info = {
+                    "account_id": str(account.id),
+                    "account_name": account.name,
+                    "account_code": account.code,
+                    "balance": float(balance),
+                }
 
-        # Calculate totals and verify balance
+                if account.account_type == AccountType.ASSET:
+                    report.current_assets += balance
+                    report.assets_by_account.append(account_info)
+                elif account.account_type == AccountType.LIABILITY:
+                    report.current_liabilities += balance
+                    report.liabilities_by_account.append(account_info)
+                elif account.account_type == AccountType.EQUITY:
+                    report.total_equity += balance
+                    report.equity_by_account.append(account_info)
+
+            logger.debug("Balance sheet generated from raw transactions")
+
         report.calculate_totals()
 
         logger.info(
@@ -241,24 +250,12 @@ class ReportGenerator:
         self,
         start_date: date,
         end_date: date,
+        account_ids: Optional[List[str]] = None,
     ) -> CashFlowStatement:
         """
         Generate Cash Flow statement.
 
-        Algorithm:
-        1. Get net income from P&L
-        2. Add back depreciation (from depreciation expense accounts)
-        3. Calculate working capital changes
-        4. Get cash from investing activities (asset purchases/sales)
-        5. Get cash from financing activities (debt/equity changes)
-        6. Calculate net cash change
-
-        Args:
-            start_date: Start date for period
-            end_date: End date for period
-
-        Returns:
-            CashFlowStatement with calculated cash flows
+        Uses canonical facts for cash movements when available.
         """
         logger.info(
             f"Generating Cash Flow Statement for {self.organization_id} "
@@ -271,15 +268,21 @@ class ReportGenerator:
             organization_id=self.organization_id,
         )
 
-        # Get net income from P&L
-        pl_report = self.generate_profit_loss(start_date, end_date)
-        report.net_income = pl_report.net_income
+        if self._has_facts():
+            # Canonical facts path
+            cash = canonical_queries.get_cash_movements(
+                self.db, self.organization_id, start_date, end_date
+            )
+            report.operating_cash_flow = cash["net_cash_flow"]
+            report.net_income = cash["cash_in"] - cash["cash_out"]
+            logger.debug("Cash flow generated from canonical facts")
+        else:
+            # Fallback: derive from P&L
+            pl_report = self.generate_profit_loss(start_date, end_date)
+            report.net_income = pl_report.net_income
+            report.operating_cash_flow = report.net_income
+            logger.debug("Cash flow generated from raw transactions via P&L")
 
-        # Simplified cash flow: use net income as operating cash flow
-        # In production, would calculate working capital changes separately
-        report.operating_cash_flow = report.net_income
-
-        # Calculate flows
         report.calculate_flows()
 
         logger.info(
@@ -293,17 +296,13 @@ class ReportGenerator:
     def generate_trial_balance(
         self,
         as_of_date: Optional[date] = None,
+        account_ids: Optional[List[str]] = None,
     ) -> dict:
         """
         Generate Trial Balance.
 
         Lists all accounts with their balances as of a date.
-
-        Args:
-            as_of_date: Date for trial balance (default: today)
-
-        Returns:
-            Dict with account balances
+        Trial balance remains account-based (not bucket-based).
         """
         if as_of_date is None:
             as_of_date = date.today()
@@ -325,7 +324,6 @@ class ReportGenerator:
         }
 
         for account in accounts:
-            # Get balance
             txns = self.db.query(Transaction).filter(
                 Transaction.account_id == account.id,
                 Transaction.transaction_date <= as_of_date,
@@ -333,7 +331,6 @@ class ReportGenerator:
 
             balance = sum((t.total_amount for t in txns), Decimal("0.00"))
 
-            # Debit or credit based on account type
             if balance != 0:
                 trial_balance["accounts"].append({
                     "account_id": str(account.id),

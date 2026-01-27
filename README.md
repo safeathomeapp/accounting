@@ -106,12 +106,15 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 - ✅ **Client-specific nominal accounts** (156 industry-specific accounts across 5 clients) *(Jan 26)*
 - ✅ **User role management (RBAC)** (Admin/Manager/Accountant/Viewer roles) *(Jan 26)*
 - ✅ **Settings page redesign** (User management, Access Levels, Integrations tabs) *(Jan 26)*
+- ✅ **Canonical data mapping layer** (MappingEngine, cashflow_facts_v1, quarantine, coverage dashboard) *(Jan 27)*
+- ✅ **Data quality dashboard** (coverage stats, quarantine management, mapping CRUD) *(Jan 27)*
 
 ### In Progress
 - 🔄 Phase 4C: Backend Integration (~85% complete)
 - ⏳ FreeAgent platform adapter (docs complete, awaiting API sandbox)
 - 📋 CRUD UI forms (create/edit dialogs needed)
 - 📋 Client/End-user reporting (subcontractor docs pending review)
+- 📋 Platform canonical mappings needed: FreeAgent, ClearBooks, FreshBooks (see `docs/PLATFORM_ONBOARDING.md`)
 
 ---
 
@@ -260,6 +263,13 @@ WHERE total_amount != amount + tax_amount;
 - [ ] Implement platform adapter
 - [ ] Write comprehensive tests (80%+ coverage)
 - [ ] Integration testing with sandbox
+- [ ] **Canonical mapping onboarding** (see `docs/PLATFORM_ONBOARDING.md`):
+  - [ ] Document all (transaction_type, status) combinations from mapper
+  - [ ] Add mappings to `backend/canonical/mapping_definitions.py`
+  - [ ] Seed mappings: `python scripts/seed_canonical_mappings.py --replace`
+  - [ ] Generate facts: `python scripts/generate_facts.py --rebuild`
+  - [ ] Validate 100% coverage: `python scripts/validate_platform_mappings.py --platform <name>`
+  - [ ] Verify reports include new platform data
 - [ ] Document completion
 
 ---
@@ -349,10 +359,17 @@ backend/
 ├── ai/             # AI integration (empty - future)
 ├── analytics/      # Analytics engine ✅ COMPLETE
 ├── api/            # REST endpoints ✅ COMPLETE
+├── canonical/      # Canonical mapping layer ✅ COMPLETE (Jan 27)
+│   ├── models.py           # ORM: PlatformTransactionMapping, CashflowFact, IngestionQuarantine
+│   ├── engine.py           # MappingEngine: maps transactions -> facts or quarantine
+│   ├── mapping_definitions.py  # Single source of truth for all platform mappings
+│   ├── queries.py          # Shared query helpers for reporting from facts
+│   ├── listeners.py        # Auto-generates facts on transaction insert/update
+│   └── utils.py            # Coverage stats, unmapped type queries
 ├── currency/       # Multi-currency ✅ COMPLETE
 ├── models/         # Database models ✅ COMPLETE
 ├── monitoring/     # Real-time monitoring ✅ COMPLETE
-├── reporting/      # Report generation ✅ COMPLETE
+├── reporting/      # Report generation ✅ COMPLETE (reads from canonical facts)
 ├── sync/           # Sync engine ✅ COMPLETE
 └── tax/            # Tax compliance ✅ COMPLETE
 ```
@@ -420,6 +437,12 @@ frontend/
 | **Governance Document** | `/docs/DATABASE_ARCHITECTURE/MASTER_GOVERNANCE_DOCUMENT.md` | FCA alignment, compliance, policies |
 | Current Schema | `/docs/DATABASE_ARCHITECTURE/current_schema_export_2026-01-22.sql` | PostgreSQL schema snapshot |
 | Evidence Scripts | `/docs/DATABASE_ARCHITECTURE/evidence_pack_scripts/` | Audit artifact generation |
+
+### Canonical Layer & Platform Onboarding
+| Document | Location | Purpose |
+|----------|----------|---------|
+| **Platform Onboarding** | `/docs/PLATFORM_ONBOARDING.md` | Step-by-step guide for adding new platforms to canonical layer |
+| Mapping Definitions | `backend/canonical/mapping_definitions.py` | Single source of truth for all platform mappings |
 
 ### Platform Guides
 | Document | Location | Purpose |
@@ -518,6 +541,6 @@ When ending a session, create:
 
 ---
 
-**Last Updated**: January 26, 2026 (Session 2)
-**Updated By**: Claude Code - Added client-specific accounts, RBAC, Settings redesign
-**Next Priority**: ⚠️ DISCUSSION REQUIRED - See "Next Session" section above. Subcontractor reports to review.
+**Last Updated**: January 27, 2026 (Session 3)
+**Updated By**: Claude Code - Canonical data mapping layer, data quality dashboard, platform onboarding docs
+**Next Priority**: Platform canonical mappings for FreeAgent, ClearBooks, FreshBooks when APIs are connected. See `docs/PLATFORM_ONBOARDING.md`.

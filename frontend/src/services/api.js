@@ -145,4 +145,43 @@ export const accountsAPI = {
   get: (id) => api.get(`/accounts/${id}`),
 }
 
+// ============================================================================
+// DATA QUALITY API
+// ============================================================================
+
+// Data quality routes use /api/data-quality prefix (not /api/v1)
+const dqBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace('/api/v1', '/api/data-quality')
+const dqApi = axios.create({
+  baseURL: dqBase,
+  headers: { 'Content-Type': 'application/json' },
+})
+dqApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+dqApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('authToken')
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export const dataQualityAPI = {
+  getCoverage: (orgId) => dqApi.get(`/orgs/${orgId}/coverage`),
+  getQuarantine: (orgId, resolved = false) => dqApi.get(`/orgs/${orgId}/quarantine`, { params: { resolved } }),
+  resolveQuarantine: (orgId, quarantineId) => dqApi.post(`/orgs/${orgId}/quarantine/${quarantineId}/resolve`),
+  resolveAllQuarantine: (orgId) => dqApi.post(`/orgs/${orgId}/quarantine/resolve-all`),
+  getUnmappedTypes: (orgId) => dqApi.get(`/orgs/${orgId}/unmapped-types`),
+  listMappings: (params = {}) => dqApi.get('/mappings', { params }),
+  createMapping: (data) => dqApi.post('/mappings', null, { params: data }),
+  updateMapping: (id, data) => dqApi.put(`/mappings/${id}`, null, { params: data }),
+  deleteMapping: (id) => dqApi.delete(`/mappings/${id}`),
+  rebuildFacts: (orgId) => dqApi.post(`/orgs/${orgId}/rebuild-facts`),
+}
+
 export default api

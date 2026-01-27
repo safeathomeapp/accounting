@@ -51,6 +51,9 @@ from backend.models.analytics import (
     ForecastType, ForecastMethod, MetricType, TrendDirection
 )
 
+# Canonical mapping layer models are imported directly from backend.canonical.models
+# to avoid circular imports (canonical models import Base from this package).
+
 # Export all models for easy importing
 __all__ = [
     "Base",

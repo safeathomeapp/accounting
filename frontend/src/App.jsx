@@ -13,6 +13,7 @@ import TransactionList from './pages/TransactionList'
 import AccountsList from './pages/AccountsList'
 import SyncMonitor from './pages/SyncMonitor'
 import Settings from './pages/Settings'
+import DataQuality from './pages/DataQuality'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore()
@@ -98,6 +99,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/data-quality"
+            element={
+              <ProtectedRoute>
+                <DataQuality />
               </ProtectedRoute>
             }
           />

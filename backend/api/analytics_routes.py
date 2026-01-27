@@ -14,6 +14,8 @@ from backend.models import Account, Transaction, SyncHistory
 from backend.reporting.reconciliation import ReconciliationEngine, ReconciliationStatus
 from backend.reporting.categorization import CategorizationEngine
 from backend.reporting.generators import ReportGenerator
+from backend.canonical.models import CashflowFact, CashflowBucket
+from backend.canonical import queries as canonical_queries
 
 logger = logging.getLogger(__name__)
 
@@ -433,6 +435,24 @@ async def get_transaction_summary(
         Transaction counts, amounts, and averages
     """
     try:
+        # Try canonical facts first
+        facts = db.query(CashflowFact).filter(
+            CashflowFact.effective_date.between(start_date, end_date)
+        ).all()
+
+        if facts:
+            total = sum(abs(f.signed_amount) for f in facts)
+            count = len(facts)
+            logger.info(f"Retrieved {count} facts for summary")
+            return {
+                "period": f"{start_date} to {end_date}",
+                "transaction_count": count,
+                "total_amount": float(total),
+                "average_amount": float(total / count) if count else 0.0,
+                "data_source": "canonical_facts_v1",
+            }
+
+        # Fallback to raw transactions
         query = db.query(Transaction).filter(
             Transaction.transaction_date.between(start_date, end_date)
         )
@@ -448,6 +468,7 @@ async def get_transaction_summary(
                 "transaction_count": 0,
                 "total_amount": 0.0,
                 "average_amount": 0.0,
+                "data_source": "raw_transactions",
             }
 
         total = sum(t.amount for t in transactions)
@@ -458,6 +479,7 @@ async def get_transaction_summary(
             "transaction_count": len(transactions),
             "total_amount": float(total),
             "average_amount": float(total / len(transactions)),
+            "data_source": "raw_transactions",
         }
 
     except ValueError as e:
@@ -484,14 +506,35 @@ async def get_transactions_by_category(
         Transactions grouped and summed by category
     """
     try:
+        # Try canonical facts first - group by bucket
+        facts = db.query(CashflowFact).filter(
+            CashflowFact.effective_date.between(start_date, end_date)
+        ).all()
+
+        if facts:
+            by_category = {}
+            for fact in facts:
+                bucket = fact.canonical_bucket.value
+                if bucket not in by_category:
+                    by_category[bucket] = {"count": 0, "total": 0.0}
+                by_category[bucket]["count"] += 1
+                by_category[bucket]["total"] += float(abs(fact.signed_amount))
+
+            logger.info(f"Retrieved {len(facts)} facts by bucket")
+            return {
+                "period": f"{start_date} to {end_date}",
+                "by_category": by_category,
+                "data_source": "canonical_facts_v1",
+            }
+
+        # Fallback to raw transactions
         transactions = db.query(Transaction).filter(
             Transaction.transaction_date.between(start_date, end_date)
         ).all()
 
-        # Group by category
         by_category = {}
         for txn in transactions:
-            category = txn.category or "Uncategorized"
+            category = txn.transaction_type or "Uncategorized"
             if category not in by_category:
                 by_category[category] = {"count": 0, "total": 0.0}
             by_category[category]["count"] += 1
@@ -501,6 +544,7 @@ async def get_transactions_by_category(
         return {
             "period": f"{start_date} to {end_date}",
             "by_category": by_category,
+            "data_source": "raw_transactions",
         }
 
     except Exception as e:
@@ -524,11 +568,34 @@ async def get_transaction_trends(
     """
     try:
         start_date = date.today() - timedelta(days=days)
+
+        # Try canonical facts first
+        facts = db.query(CashflowFact).filter(
+            CashflowFact.effective_date >= start_date
+        ).all()
+
+        if facts:
+            by_date = {}
+            for fact in facts:
+                fact_date = fact.effective_date.isoformat()
+                if fact_date not in by_date:
+                    by_date[fact_date] = {"count": 0, "total": 0.0}
+                by_date[fact_date]["count"] += 1
+                by_date[fact_date]["total"] += float(abs(fact.signed_amount))
+
+            logger.info(f"Retrieved trends for {days} days ({len(facts)} facts)")
+            return {
+                "days": days,
+                "transaction_count": len(facts),
+                "by_date": by_date,
+                "data_source": "canonical_facts_v1",
+            }
+
+        # Fallback to raw transactions
         transactions = db.query(Transaction).filter(
             Transaction.transaction_date >= start_date
         ).all()
 
-        # Group by date
         by_date = {}
         for txn in transactions:
             txn_date = txn.transaction_date.isoformat()
@@ -542,6 +609,7 @@ async def get_transaction_trends(
             "days": days,
             "transaction_count": len(transactions),
             "by_date": by_date,
+            "data_source": "raw_transactions",
         }
 
     except Exception as e:

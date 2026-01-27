@@ -214,6 +214,7 @@ from backend.api.analytics_routes import router as analytics_router
 from backend.api.reports_routes import router as reports_router
 from backend.api.mobile_routes import router as mobile_router
 from backend.api.data_routes import router as data_router
+from backend.api.data_quality_routes import router as data_quality_router
 from backend.api import job_routes as job_routes_module
 
 app.include_router(auth_router, prefix="/api/v1")
@@ -224,6 +225,7 @@ app.include_router(data_router, prefix="/api/v1")
 app.include_router(analytics_router)
 app.include_router(reports_router)
 app.include_router(mobile_router)
+app.include_router(data_quality_router)
 
 
 @app.get("/api/v1/ai", tags=["AI"])
@@ -274,6 +276,13 @@ async def startup_event() -> None:
     except Exception as e:
         logger.error(f"Failed to initialize sync scheduler: {e}", exc_info=True)
         # Don't fail startup if scheduler fails, but log the error
+
+    # Register canonical fact listeners (auto-generate facts on transaction insert/update)
+    try:
+        from backend.canonical.listeners import register_canonical_listeners
+        register_canonical_listeners()
+    except Exception as e:
+        logger.error(f"Failed to register canonical listeners: {e}", exc_info=True)
 
     logger.info("Application started successfully")
 
