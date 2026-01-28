@@ -19,6 +19,9 @@ import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
 import { SkeletonCard } from '../components/Skeleton'
 import { useSortedItems } from '../hooks/useSortedItems'
+import ClientFormModal from '../components/ClientFormModal'
+import TransactionFormModal from '../components/TransactionFormModal'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
@@ -32,6 +35,14 @@ export default function ClientDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('transactions')
+
+  // Modal states
+  const [showClientEdit, setShowClientEdit] = useState(false)
+  const [showTxnForm, setShowTxnForm] = useState(false)
+  const [editingTxn, setEditingTxn] = useState(null)
+  const [txnFormDefaults, setTxnFormDefaults] = useState({})
+  const [deleteTarget, setDeleteTarget] = useState(null) // { type: 'client' | 'transaction', id }
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   // Transaction filters and pagination
   const [search, setSearch] = useState('')
@@ -130,6 +141,38 @@ export default function ClientDetail() {
     { id: 3, type: 'payment', title: 'Corporation Tax', date: '2026-01-01', status: 'overdue' },
   ]
 
+  const openNewTxn = (type) => {
+    setEditingTxn(null)
+    setTxnFormDefaults({ transaction_type: type })
+    setShowTxnForm(true)
+  }
+
+  const openEditTxn = (txn) => {
+    setEditingTxn(txn)
+    setShowTxnForm(true)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
+    try {
+      if (deleteTarget.type === 'client') {
+        await clientsAPI.delete(deleteTarget.id)
+        addToast('Client deactivated', 'success')
+        navigate('/home')
+      } else {
+        await transactionsAPI.delete(deleteTarget.id)
+        addToast('Transaction deleted', 'success')
+        setDeleteTarget(null)
+        fetchClientData()
+      }
+    } catch (err) {
+      addToast(err.response?.data?.detail || 'Delete failed', 'error')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   const tabs = [
     { id: 'transactions', label: 'Transactions', count: transactions.length },
     { id: 'accounts', label: 'Accounts', count: accounts.length },
@@ -220,21 +263,40 @@ export default function ClientDetail() {
 
             {/* Right: Quick Actions */}
             <div className="flex items-center gap-2">
-              <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2 text-sm font-medium">
+              <button
+                onClick={() => openNewTxn('invoice')}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2 text-sm font-medium"
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
                 New Invoice
               </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm font-medium">
+              <button
+                onClick={() => openNewTxn('payment')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm font-medium"
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
                 </svg>
                 Record Payment
               </button>
-              <button className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition" title="Edit Client">
+              <button
+                onClick={() => setShowClientEdit(true)}
+                className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                title="Edit Client"
+              >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setDeleteTarget({ type: 'client', id: clientId })}
+                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition"
+                title="Delete Client"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
             </div>
@@ -417,6 +479,7 @@ export default function ClientDetail() {
                                   >
                                     Status {sort.getSortIndicator('status')}
                                   </th>
+                                  <th className="pb-3 text-right">Actions</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -452,6 +515,28 @@ export default function ClientDetail() {
                                       }`}>
                                         {txn.status}
                                       </span>
+                                    </td>
+                                    <td className="py-3 text-right">
+                                      <div className="flex justify-end gap-1">
+                                        <button
+                                          onClick={() => openEditTxn(txn)}
+                                          className="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                                          title="Edit"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                          </svg>
+                                        </button>
+                                        <button
+                                          onClick={() => setDeleteTarget({ type: 'transaction', id: txn.id })}
+                                          className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition"
+                                          title="Delete"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                          </svg>
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
@@ -737,6 +822,36 @@ export default function ClientDetail() {
           </div>
         </div>
       </main>
+
+      <ClientFormModal
+        isOpen={showClientEdit}
+        onClose={() => setShowClientEdit(false)}
+        onSuccess={fetchClientData}
+        client={client}
+      />
+
+      <TransactionFormModal
+        isOpen={showTxnForm}
+        onClose={() => { setShowTxnForm(false); setEditingTxn(null) }}
+        onSuccess={fetchClientData}
+        transaction={editingTxn}
+        clientId={clientId}
+        clients={client ? [client] : []}
+      />
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+        title={deleteTarget?.type === 'client' ? 'Deactivate Client' : 'Delete Transaction'}
+        message={
+          deleteTarget?.type === 'client'
+            ? `Are you sure you want to deactivate ${client?.name}? This will mark the client as inactive.`
+            : 'Are you sure you want to delete this transaction? This action cannot be undone.'
+        }
+        confirmLabel={deleteTarget?.type === 'client' ? 'Deactivate' : 'Delete'}
+      />
     </div>
   )
 }

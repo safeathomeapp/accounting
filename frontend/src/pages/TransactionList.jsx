@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from 'react'
 import { useToastStore } from '../stores/toastStore'
-import { transactionsAPI } from '../services/api'
+import { transactionsAPI, clientsAPI } from '../services/api'
 import Navigation from '../components/Navigation'
 import Pagination from '../components/Pagination'
 import DateRangeFilter from '../components/DateRangeFilter'
@@ -19,6 +19,8 @@ import { SkeletonTable } from '../components/Skeleton'
 import { exportToCSV } from '../utils/csvExport'
 import { useBulkSelection } from '../hooks/useBulkSelection'
 import { useSortedItems } from '../hooks/useSortedItems'
+import TransactionFormModal from '../components/TransactionFormModal'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const ITEMS_PER_PAGE = 10
 
@@ -37,9 +39,26 @@ export default function TransactionList() {
   const [totalCount, setTotalCount] = useState(0)
   const bulk = useBulkSelection(transactions)
 
+  // CRUD modal states
+  const [clients, setClients] = useState([])
+  const [showTxnForm, setShowTxnForm] = useState(false)
+  const [editingTxn, setEditingTxn] = useState(null)
+  const [deleteTargetId, setDeleteTargetId] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
   useEffect(() => {
     fetchTransactions()
+    fetchClients()
   }, [])
+
+  const fetchClients = async () => {
+    try {
+      const res = await clientsAPI.list({ limit: 500 })
+      setClients(res.data.clients || [])
+    } catch (err) {
+      console.error('Error fetching clients:', err)
+    }
+  }
 
   const fetchTransactions = async () => {
     try {
@@ -204,6 +223,35 @@ export default function TransactionList() {
   // Get unique transaction types for filter dropdown
   const transactionTypes = [...new Set(transactions.map((t) => t.type).filter(Boolean))]
 
+  const openEditTxn = (txn) => {
+    // Convert from transformed format back to API format for editing
+    setEditingTxn({
+      id: txn.id,
+      transaction_type: txn.type,
+      status: txn.status === 'Categorized' ? 'paid' : txn.status === 'Needs Review' ? 'submitted' : 'draft',
+      description: txn.description,
+      total_amount: txn.amount,
+      transaction_date: txn.date,
+      reference_number: txn.reference,
+    })
+    setShowTxnForm(true)
+  }
+
+  const handleDeleteTxn = async () => {
+    if (!deleteTargetId) return
+    setDeleteLoading(true)
+    try {
+      await transactionsAPI.delete(deleteTargetId)
+      addToast('Transaction deleted', 'success')
+      setDeleteTargetId(null)
+      fetchTransactions()
+    } catch (err) {
+      addToast(err.response?.data?.detail || 'Delete failed', 'error')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   if (error && transactions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -256,13 +304,24 @@ export default function TransactionList() {
               {totalCount.toLocaleString()} transactions from database
             </p>
           </div>
-          <button
-            onClick={handleExport}
-            disabled={filteredTransactions.length === 0}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Export CSV
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setEditingTxn(null); setShowTxnForm(true) }}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              New Transaction
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={filteredTransactions.length === 0}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Export CSV
+            </button>
+          </div>
         </div>
       </header>
 
@@ -403,6 +462,9 @@ export default function TransactionList() {
                     >
                       Status {sort.getSortIndicator('status')}
                     </th>
+                    <th className="px-6 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y dark:divide-gray-700">
@@ -463,6 +525,28 @@ export default function TransactionList() {
                           {transaction.status}
                         </span>
                       </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() => openEditTxn(transaction)}
+                            className="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                            title="Edit"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => setDeleteTargetId(transaction.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition"
+                            title="Delete"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -505,6 +589,24 @@ export default function TransactionList() {
           </div>
         </div>
       </main>
+
+      <TransactionFormModal
+        isOpen={showTxnForm}
+        onClose={() => { setShowTxnForm(false); setEditingTxn(null) }}
+        onSuccess={fetchTransactions}
+        transaction={editingTxn}
+        clients={clients}
+      />
+
+      <ConfirmDialog
+        isOpen={!!deleteTargetId}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={handleDeleteTxn}
+        loading={deleteLoading}
+        title="Delete Transaction"
+        message="Are you sure you want to delete this transaction? This action cannot be undone."
+        confirmLabel="Delete"
+      />
     </div>
   )
 }

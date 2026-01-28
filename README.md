@@ -108,11 +108,11 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 - ✅ **Settings page redesign** (User management, Access Levels, Integrations tabs) *(Jan 26)*
 - ✅ **Canonical data mapping layer** (MappingEngine, cashflow_facts_v1, quarantine, coverage dashboard) *(Jan 27)*
 - ✅ **Data quality dashboard** (coverage stats, quarantine management, mapping CRUD) *(Jan 27)*
+- ✅ **CRUD UI forms** (Modal, FormField, ConfirmDialog components + Client/Transaction create/edit/delete) *(Jan 28)*
 
 ### In Progress
-- 🔄 Phase 4C: Backend Integration (~85% complete)
+- 🔄 Phase 4C: Backend Integration (~90% complete)
 - ⏳ FreeAgent platform adapter (docs complete, awaiting API sandbox)
-- 📋 CRUD UI forms (create/edit dialogs needed)
 - 📋 Client/End-user reporting (subcontractor docs pending review)
 - 📋 Platform canonical mappings needed: FreeAgent, ClearBooks, FreshBooks (see `docs/PLATFORM_ONBOARDING.md`)
 
@@ -127,7 +127,7 @@ What should be the focus for the next phase of work?
 
 | Option | Description | Effort |
 |--------|-------------|--------|
-| **A. CRUD UI Forms** | Create/edit dialogs for transactions, clients, accounts | Medium |
+| ~~**A. CRUD UI Forms**~~ | ✅ Complete (Jan 28) | ~~Medium~~ |
 | **B. Real OAuth** | Replace demo OAuth with real Xero/QuickBooks integration | Medium |
 | **C. Client Reporting** | Review subcontractor docs and implement end-user reports | TBD |
 | **D. Documents Tab** | Implement document upload/management in ClientDetail | Medium |
@@ -143,7 +143,7 @@ Documents uploaded to `/docs/READ ME NEXT/` from subcontractor:
 
 ### Phase 4C Completion Criteria
 What defines "complete" for Phase 4C before moving to Phase 5?
-- [ ] CRUD UI forms?
+- [x] CRUD UI forms? ✅ Complete (Jan 28)
 - [ ] Real OAuth?
 - [ ] Client reporting?
 - [ ] All of the above?

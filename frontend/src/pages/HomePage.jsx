@@ -14,6 +14,7 @@ import { clientsAPI } from '../services/api'
 import { useToastStore } from '../stores/toastStore'
 import Navigation from '../components/Navigation'
 import { SkeletonGrid } from '../components/Skeleton'
+import ClientFormModal from '../components/ClientFormModal'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -22,6 +23,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
+  const [showClientForm, setShowClientForm] = useState(false)
 
   useEffect(() => {
     fetchClients()
@@ -116,15 +118,26 @@ export default function HomePage() {
                 {clients.length} client{clients.length !== 1 ? 's' : ''} in your practice
               </p>
             </div>
-            {/* Search */}
-            <div className="w-full md:w-80">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search clients..."
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
+            {/* Search + New Client */}
+            <div className="flex items-center gap-3">
+              <div className="w-full md:w-80">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search clients..."
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <button
+                onClick={() => setShowClientForm(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm font-medium whitespace-nowrap"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                New Client
+              </button>
             </div>
           </div>
         </div>
@@ -237,6 +250,12 @@ export default function HomePage() {
           </div>
         )}
       </main>
+
+      <ClientFormModal
+        isOpen={showClientForm}
+        onClose={() => setShowClientForm(false)}
+        onSuccess={fetchClients}
+      />
     </div>
   )
 }
