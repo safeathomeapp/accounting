@@ -96,9 +96,18 @@ class AccountingPlatform(Base):
     # Valid values: 'xero', 'quickbooks'
     platform_version = Column(String(50), nullable=True)
 
+    # Business Client (the managed business whose external system this connects to)
+    # Composite FK in DB enforces same-org. Nullable during transition.
+    managed_client_id = Column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True
+    )
+
     # OAuth Credentials
-    # client_id: plaintext (needed for OAuth flows, not sensitive)
-    client_id = Column(String(500), nullable=False)
+    # oauth_client_id: plaintext (needed for OAuth flows, not sensitive)
+    # NOTE: Renamed from client_id to remove semantic collision with business clients
+    oauth_client_id = Column(String(500), nullable=False)
     # client_secret: ENCRYPTED (sensitive - never log or display)
     client_secret_encrypted = Column(LargeBinary, nullable=False)
     # access_token: ENCRYPTED (sensitive - changes frequently)

@@ -1,3 +1,5 @@
+# Glossary & Domain Canon
+
 # Glossary & Naming Conventions
 
 **Purpose**: Canonical definitions for all team members. Use these terms consistently in code, comments, documentation, and conversation.
@@ -291,3 +293,173 @@ When you introduce a new term:
 
 **Last Updated**: February 3, 2026
 **Maintainer**: Engineering Team
+
+---
+
+## Foundational Concepts (Canonical)
+
+**Tenant Boundary**  
+The database enforces tenancy at the **organization** level. No row belonging to one organization may be visible to, or referenced by, another organization unless explicitly designed and documented.  
+This is enforced structurally (Row-Level Security + constraints), not by application convention.
+
+**External Realm**  
+An external realm is the scope within which an external provider’s identifiers are guaranteed to be unique (e.g. a Xero tenant or a QuickBooks company).  
+External IDs are **never assumed globally unique** unless explicitly proven by the provider.
+
+**Idempotency**  
+Idempotency means retrying the same external sync operation must not create duplicate records.  
+Idempotency is enforced at the database level using uniqueness constraints, not application logic.
+
+**Declarative Enforcement**  
+Wherever possible, invariants are enforced using declarative database constraints (FOREIGN KEY, UNIQUE, CHECK).  
+Triggers and application logic are secondary controls and must not be the sole enforcement mechanism.
+
+---
+
+## Core Domain Entities (Extended Definitions)
+
+### Organization
+**Definition:**  
+The SaaS tenant. Represents an accounting practice or firm using the platform.
+
+**Uniqueness:**  
+Not globally unique by name.
+
+**Scope:**  
+Top-level tenant boundary. All Row-Level Security policies and cross-table integrity checks ultimately scope to `organization_id`.
+
+**Notes:**  
+An organization owns users and clients, but does **not** own a chart of accounts directly.
+
+---
+
+### User
+**Definition:**  
+A person with login credentials who performs actions on behalf of an organization.
+
+**Uniqueness:**  
+Email address is globally unique (case-insensitive).
+
+**Lifecycle States:**  
+- `pending`: no organization assigned yet  
+- `active`: belongs to an organization  
+- `suspended` / `disabled`: access revoked
+
+**Notes:**  
+A user must never be active without an `organization_id`. This invariant is enforced at the database level.
+
+---
+
+### Client
+**Definition:**  
+A business entity managed by an organization (the organization’s customer).
+
+**Uniqueness:**  
+Unique only within an organization.
+
+**Scope:**  
+Clients are children of an organization. All client-owned data must reference both `client_id` and `organization_id` consistently.
+
+**Notes:**  
+Each client may have its own independent external accounting system.
+
+---
+
+### Accounts
+**Definition:**  
+Client-scoped chart of accounts entries, typically synced from the client’s external accounting platform.
+
+**Uniqueness:**  
+- Account codes are unique per client.  
+- External account identities are unique per client per external realm.
+
+**Scope:**  
+Accounts belong to exactly one client and one organization.
+
+**Notes:**  
+There is no organization-level chart of accounts. This is intentional and non-standard.
+
+---
+
+## External Integration Terminology
+
+### Accounting Platform
+**Definition:**  
+A connection to an external accounting provider (e.g. Xero, QuickBooks) representing a single external realm.
+
+**Scope:**  
+Belongs to one organization and (in the target model) one client.
+
+**Notes:**  
+A single organization may manage many accounting platforms on behalf of different clients.
+
+---
+
+### platform_id
+**Definition:**  
+The external provider’s identifier for a specific object (account, transaction, etc.).
+
+**Uniqueness Scope:**  
+Unique only within the external realm (accounting platform).  
+Never assumed unique across organizations or clients.
+
+**Notes:**  
+All uses of `platform_id` must be paired with an appropriate scoping key (`client_id` or `accounting_platform_id`).
+
+---
+
+### oauth_client_id
+**Definition:**  
+OAuth application identifier issued by an external provider.
+
+**Notes:**  
+This is **not** a reference to a business client. The name exists to prevent semantic confusion.
+
+---
+
+## NULL Semantics (Required Reading)
+
+In this system, NULL values are not arbitrary. Each nullable field has defined semantics.
+
+Examples:
+- `users.organization_id`  
+  - NULL only when `status = 'pending'`  
+  - Forbidden otherwise
+
+- `accounts.platform_id`  
+  - NULL only for local/manual accounts (if supported)  
+  - Non-NULL for synced accounts
+
+- `accounting_platforms.managed_client_id`  
+  - NULL only during transitional phases  
+  - Target state: NOT NULL for all active connections
+
+NULL must always mean one of:
+- “not yet assigned (transitional)”
+- “not applicable by design”
+
+NULL must never mean “we didn’t get around to setting it”.
+
+---
+
+## Deferred Architectural Decisions
+
+The following decisions are intentionally deferred and documented:
+
+- **Assignment-based access control (RLS)**  
+  All users in an organization can access all clients in that organization.  
+  `client_assignments` track workflow responsibility, not permissions.  
+  This is a product decision and may change for enterprise customers.
+
+- **Fully client-scoped accounting_platforms**  
+  Schema changes are in progress to support this.  
+  During transition, constraints exist to prevent drift.
+
+Deferred does not mean forgotten. Each item has explicit revisit criteria.
+
+---
+
+## Governance Rule
+
+Any new database table, column, or constraint must be added to this glossary or explicitly reference an existing glossary term.  
+If it cannot be clearly defined here, it should not exist in the schema.

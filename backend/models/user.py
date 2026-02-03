@@ -27,15 +27,21 @@ class User(Base):
 
     Attributes:
         id (UUID): Primary key
-        email (str): User email (unique)
+        email (str): User email (case-insensitive unique)
         password_hash (str): Hashed password
         name (str): User display name
-        organization_id (UUID): User's organization
+        organization_id (UUID): User's organization (NULL only for pending users)
+        status (str): Lifecycle status (pending, active, suspended, disabled)
         is_active (bool): Whether user can login
         is_admin (bool): Whether user has admin privileges
+        role (str): RBAC role (admin, manager, accountant, viewer)
         created_at (DateTime): When created
         updated_at (DateTime): When last updated
         last_login (DateTime): When user last logged in
+
+    DB Constraints:
+        - Case-insensitive email uniqueness via lower(email) index
+        - CHECK: pending users may have NULL org; non-pending must have org
     """
 
     __tablename__ = "users"
@@ -66,6 +72,11 @@ class User(Base):
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
+
+    # Lifecycle status: pending, active, suspended, disabled
+    # pending users have NULL organization_id (registration in progress)
+    # non-pending users must have organization_id (DB enforced via CHECK)
+    status = Column(String(20), default="pending", nullable=False)
 
     # Role-based access control
     # Roles: admin, manager, accountant, viewer
