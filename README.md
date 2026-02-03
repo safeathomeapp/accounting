@@ -8,10 +8,10 @@
 
 **This section is updated each session. Follow these steps before doing ANY work:**
 
-### Current Session Instructions (February 2, 2026)
+### Current Session Instructions (February 3, 2026)
 
 1. **Read this entire README** - Understand current state and rules
-2. **Apply RLS migration** if not already done:
+2. **Apply migrations** if not already done (includes Document Review tables and RLS):
    ```bash
    alembic upgrade head
    ```
@@ -20,7 +20,8 @@
    pytest tests/ -v
    ```
 4. **Review Session Notes**: `/docs/SESSION_NOTES/SESSION_NOTES_2026-02-02.md`
-5. **Next priorities**: AI OCR integration or real OAuth (see discussion section)
+5. **Current branch**: `feat/doc-review-ui` - Document Review UI and Claude OCR implemented
+6. **Next priorities**: Test Claude OCR with real invoices, then real OAuth or merge to master
 
 ### Session Workflow
 ```
@@ -73,9 +74,9 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 
 ---
 
-## Current State (February 2, 2026)
+## Current State (February 3, 2026)
 
-### You Are Here: Month 6, Phase 5 Started (RLS Complete)
+### You Are Here: Month 6, Phase 5 Complete (Document Review In Progress)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
@@ -83,6 +84,8 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 | Frontend | ✅ Phase 4C In Progress | Connected to PostgreSQL |
 | Database Schema | ✅ Hardened | Phase 4A complete (Jan 24, 2026) |
 | **Row-Level Security** | ✅ Complete | Phase 5 RLS policies (Feb 2, 2026) |
+| **Document Review UI** | ✅ Scaffolded | Upload, extract, review, submit workflow (Feb 2) |
+| **Claude OCR** | ⚠️ Implemented | Code complete, needs real invoice testing (Feb 2) |
 | Platform Adapters | ✅ Xero + QuickBooks | FreeAgent docs ready |
 | Multi-Tenant Auth | ✅ Complete | JWT + Registration + Org scoping |
 | Client Hub | ✅ Complete | HomePage + ClientDetail pages |
@@ -116,13 +119,15 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 - ✅ **Data quality dashboard** (coverage stats, quarantine management, mapping CRUD) *(Jan 27)*
 - ✅ **CRUD UI forms** (Modal, FormField, ConfirmDialog components + Client/Transaction create/edit/delete) *(Jan 28)*
 - ✅ **Row-Level Security (RLS)** (Multi-tenant isolation enforced at database level) *(Feb 2)*
+- ✅ **Document Review UI** (Upload, OCR extraction, draft editing, submission workflow) *(Feb 2)*
+- ✅ **Claude Vision OCR Service** (AI-powered document extraction for invoices/bills/receipts) *(Feb 2)*
 
 ### In Progress
-- 🔄 Phase 4C: Backend Integration (~90% complete)
+- 🔄 Phase 4C: Backend Integration (~95% complete)
 - ⏳ FreeAgent platform adapter (docs complete, awaiting API sandbox)
-- 📋 Client/End-user reporting (subcontractor docs pending review)
+- 📋 Client/End-user reporting (subcontractor docs reviewed, implementation pending)
 - 📋 Platform canonical mappings needed: FreeAgent, ClearBooks, FreshBooks (see `docs/PLATFORM_ONBOARDING.md`)
-- 📋 AI OCR integration for document review (stub exists, needs real AI)
+- 🧪 **Claude OCR testing** - Code complete, needs testing with real invoices/receipts
 
 ---
 
@@ -138,23 +143,27 @@ What should be the focus for the next phase of work?
 | ~~**A. CRUD UI Forms**~~ | ✅ Complete (Jan 28) | ~~Medium~~ |
 | **B. Real OAuth** | Replace demo OAuth with real Xero/QuickBooks integration | Medium |
 | **C. Client Reporting** | Review subcontractor docs and implement end-user reports | TBD |
-| **D. Documents Tab** | Implement document upload/management in ClientDetail | Medium |
-| **E. Phase 5 (RLS)** | Row-Level Security for production hardening | High |
+| ~~**D. Documents Tab**~~ | ✅ Complete (Feb 2) - Document Review UI with Claude OCR | ~~Medium~~ |
+| ~~**E. Phase 5 (RLS)**~~ | ✅ Complete (Feb 2) - Row-Level Security policies applied | ~~High~~ |
 | **F. Performance** | Query optimization, caching, load testing | Medium |
+| **G. Test OCR** | Test Claude OCR with real invoices/receipts | Low |
+| **H. Merge Branch** | Merge feat/doc-review-ui to master | Low |
 
-### Subcontractor Reports to Review
-Documents uploaded to `/docs/READ ME NEXT/` from subcontractor:
-- `Canonical_Data_Mapping_and_Reporting_Conformity_v1.md`
-- `Engineering_and_Data_Rules_of_the_Road.md`
-
-**Action**: Review these documents at session start for potential integration into roadmap.
+### Subcontractor Reports (Reviewed)
+Documents in `/docs/READ ME NEXT/`:
+- ✅ `Canonical_Data_Mapping_and_Reporting_Conformity_v1.md` - Reviewed, principles integrated
+- ✅ `Engineering_and_Data_Rules_of_the_Road.md` - Reviewed, principles integrated
+- ✅ `One_Page_Architecture_Diagram_v1.md` - Reviewed, architecture documented
+- ✅ `migrations_cashflow_v1/` - SQL migration scripts extracted and available
 
 ### Phase 4C Completion Criteria
-What defines "complete" for Phase 4C before moving to Phase 5?
+What defines "complete" for Phase 4C before moving to Phase 6 (Beta)?
 - [x] CRUD UI forms? ✅ Complete (Jan 28)
-- [ ] Real OAuth?
+- [x] Document Review UI? ✅ Complete (Feb 2)
+- [x] RLS Policies? ✅ Complete (Feb 2)
+- [ ] Real OAuth? (blocked on API keys)
 - [ ] Client reporting?
-- [ ] All of the above?
+- [ ] OCR tested with real documents?
 
 ---
 
@@ -301,14 +310,15 @@ WHERE total_amount != amount + tax_amount;
 
 ---
 
-### Phase 5: Production Hardening (Month 7)
+### Phase 5: Production Hardening ✅ COMPLETE (Feb 2, 2026)
 **Goal**: Security and compliance readiness
 
-#### Row-Level Security (RLS) ✅ COMPLETE (Feb 2, 2026)
+#### Row-Level Security (RLS) ✅ COMPLETE
 - [x] Create database roles (app_user, app_readonly, app_admin)
-- [x] Enable RLS on tenant-scoped tables
-- [x] Add tenant context functions to FastAPI
-- [x] Create RLS-aware auth dependencies
+- [x] Enable RLS on tenant-scoped tables (clients, transactions, accounts, etc.)
+- [x] Add tenant context functions to FastAPI (`set_tenant_context`, `get_db_for_user`)
+- [x] Create RLS-aware auth dependencies (`get_current_user_with_rls`)
+- [x] RLS policies on document tables (document_inbox_item, document_ocr_result, etc.)
 - [ ] Migrate production to use app_user role (optional hardening)
 - [ ] Test tenant isolation thoroughly
 
@@ -551,6 +561,7 @@ When ending a session, create:
 
 ---
 
-**Last Updated**: February 2, 2026 (Session 4)
-**Updated By**: Claude Code - Row-Level Security (RLS) implementation for multi-tenant isolation
-**Next Priority**: AI OCR integration OR real OAuth (depending on API key status). See session notes.
+**Last Updated**: February 3, 2026 (Session 5)
+**Updated By**: Claude Code - Committed Document Review UI, Claude OCR, and RLS to GitHub
+**Branch**: `feat/doc-review-ui` (pushed to origin)
+**Next Priority**: Test Claude OCR with real invoices, then merge to master or proceed with real OAuth.
