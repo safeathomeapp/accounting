@@ -460,8 +460,8 @@ def extract_document_endpoint(
         "header": {
             "doc_type": draft_data["doc_type"],
             "counterparty_name": draft_data["counterparty_name"],
-            "doc_date": draft_data["doc_date"].isoformat(),
-            "due_date": draft_data["due_date"].isoformat(),
+            "doc_date": draft_data["doc_date"].isoformat() if draft_data["doc_date"] else None,
+            "due_date": draft_data["due_date"].isoformat() if draft_data["due_date"] else None,
             "currency": draft_data["currency"],
             "invoice_no": draft_data["invoice_no"],
             "totals": draft.totals_guess,
