@@ -15,12 +15,16 @@ Author: Claude Code
 Created: February 3, 2026
 """
 
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, func, Index, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, func, CheckConstraint, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
 
 from backend.models import Base
+
+
+# Valid assignment roles - enforced by CHECK constraint in DB
+ASSIGNMENT_ROLES = ('primary', 'accountant', 'reviewer', 'backup')
 
 
 class ClientAssignment(Base):
@@ -30,24 +34,31 @@ class ClientAssignment(Base):
     This is NOT access control - all users in an organization can access all clients.
     Assignments track who is responsible for a client's work.
 
+    IMPORTANT: Composite FKs enforce that client, user, and assigner all belong
+    to the same organization. This prevents cross-org assignment bugs at DB level.
+
     Attributes:
         id (UUID): Primary key
-        organization_id (UUID): Organization (for RLS)
+        organization_id (UUID): Organization (for RLS and composite FK enforcement)
         client_id (UUID): The client being assigned
         user_id (UUID): The user being assigned
-        assignment_role (str): Role on this client
+        assignment_role (str): Role on this client (CHECK constrained)
             - 'primary': Primary accountant/contact
             - 'accountant': Working accountant
             - 'reviewer': Reviews work before submission
             - 'backup': Covers during absence
         is_active (bool): Whether assignment is active
-        assigned_by (UUID): User who made the assignment
+        assigned_by (UUID): User who made the assignment (same-org enforced)
         assigned_at (DateTime): When assignment was made
         created_at (DateTime): When record created
         updated_at (DateTime): When record updated
 
-    Unique Constraint:
-        (client_id, user_id) - one assignment per user per client
+    Constraints:
+        - UNIQUE (client_id, user_id) - one assignment per user per client
+        - CHECK (assignment_role IN (...)) - prevents role drift
+        - Composite FK (org_id, client_id) → clients - enforces same-org
+        - Composite FK (org_id, user_id) → users - enforces same-org
+        - Composite FK (org_id, assigned_by) → users - enforces same-org
 
     Usage:
         # Assign user to client
@@ -166,6 +177,10 @@ class ClientAssignment(Base):
     # Constraints
     __table_args__ = (
         UniqueConstraint("client_id", "user_id", name="uq_client_assignments_client_user"),
+        CheckConstraint(
+            "assignment_role IN ('primary', 'accountant', 'reviewer', 'backup')",
+            name="ck_client_assignments_role"
+        ),
     )
 
     def __repr__(self) -> str:
