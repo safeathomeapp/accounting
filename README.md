@@ -440,6 +440,11 @@ frontend/
 
 ## Essential References
 
+### Terminology & Standards
+| Document | Location | Purpose |
+|----------|----------|---------|
+| **Glossary** | `/docs/GLOSSARY.md` | **READ FIRST** - Domain terms, naming conventions, code standards |
+
 ### Architecture & Design
 | Document | Location | Purpose |
 |----------|----------|---------|
@@ -492,6 +497,7 @@ frontend/
 - ❌ Remove existing documentation
 
 ### DO
+- ✅ **Read GLOSSARY.md** before introducing new terms
 - ✅ Add new features using existing patterns
 - ✅ Maintain 95%+ test coverage
 - ✅ Ask questions when uncertain
@@ -499,6 +505,7 @@ frontend/
 - ✅ Follow the roadmap
 - ✅ Run pre-flight checks before database changes
 - ✅ Keep session notes comprehensive
+- ✅ Comment non-obvious code (why, not what)
 
 ---
 
