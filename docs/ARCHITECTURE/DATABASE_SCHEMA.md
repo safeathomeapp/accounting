@@ -1,8 +1,9 @@
 # Database Schema Design
-**Version:** 1.0
-**Date:** November 23, 2025
-**Status:** Foundation Phase Ready
+**Version:** 2.0
+**Date:** February 3, 2026
+**Status:** Production Hardened (FINAL_NON_NEGOTIABLE_DB_STANCE compliant)
 **Database:** PostgreSQL 17.6
+**Current Migration:** v2_114_auth_security_definer
 
 ---
 
@@ -45,6 +46,18 @@
    - Support for large datasets
    - Query optimization opportunities
    - Partitioning-ready
+
+7. **Declarative Enforcement** (Added Feb 2026)
+   - Database is the control plane, not the application
+   - Composite FKs prevent cross-org references
+   - CHECK constraints enforce state invariants
+   - Idempotency uniqueness prevents sync duplicates
+
+8. **Auditable Auth Bypass** (Added Feb 2026)
+   - SECURITY DEFINER functions for auth operations
+   - FORCE RLS on users/organizations tables
+   - Dedicated auth_definer role owns bypass functions
+   - Single explicit bypass surface for login/registration
 
 ---
 
@@ -92,7 +105,7 @@ CREATE INDEX idx_organizations_is_active ON organizations(is_active);
 
 ### 2. accounting_platforms
 
-**Purpose:** Track which accounting platforms this organization uses
+**Purpose:** Track which accounting platforms this organization uses. Each platform connection represents an external realm.
 
 ```sql
 CREATE TABLE accounting_platforms (
@@ -103,8 +116,12 @@ CREATE TABLE accounting_platforms (
     platform_name VARCHAR(50) NOT NULL, -- 'xero', 'quickbooks'
     platform_version VARCHAR(50),
 
-    -- OAuth information
-    client_id VARCHAR(500) NOT NULL,
+    -- Business client (the managed business whose external system this connects to)
+    -- Composite FK in DB enforces same-org. Nullable during transition.
+    managed_client_id UUID,
+
+    -- OAuth information (renamed from client_id to avoid semantic collision)
+    oauth_client_id VARCHAR(500) NOT NULL,  -- OAuth app ID, NOT a business client
     client_secret_encrypted BYTEA NOT NULL, -- Encrypted with ENCRYPTION_KEY
     access_token_encrypted BYTEA, -- Encrypted
     refresh_token_encrypted BYTEA, -- Encrypted
@@ -126,17 +143,26 @@ CREATE TABLE accounting_platforms (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
+    -- Composite FK: managed_client must belong to same organization
+    CONSTRAINT fk_accounting_platforms_managed_client
+        FOREIGN KEY (organization_id, managed_client_id)
+        REFERENCES clients (organization_id, id)
+        ON DELETE SET NULL,
+
     CONSTRAINT valid_platform CHECK (platform_name IN ('xero', 'quickbooks')),
     CONSTRAINT unique_platform_per_org UNIQUE(organization_id, platform_name)
 );
 
 CREATE INDEX idx_platforms_org ON accounting_platforms(organization_id);
+CREATE INDEX idx_platforms_managed_client ON accounting_platforms(managed_client_id);
 CREATE INDEX idx_platforms_status ON accounting_platforms(connection_status);
 CREATE INDEX idx_platforms_sync ON accounting_platforms(last_sync_at);
 ```
 
 **Notes:**
 - Supports multiple platforms per organization
+- **oauth_client_id**: OAuth app ID (renamed from client_id to avoid confusion)
+- **managed_client_id**: Business client this connection serves (composite FK enforced)
 - OAuth tokens encrypted at rest
 - Status tracking for monitoring
 - Error messages for debugging
@@ -272,15 +298,16 @@ CREATE INDEX idx_transactions_sync ON transactions(last_synced_at);
 
 ### 5. accounts
 
-**Purpose:** Store chart of accounts from accounting platforms
+**Purpose:** Store chart of accounts from accounting platforms. **CLIENT-SCOPED** (not organization-scoped).
 
 ```sql
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    client_id UUID NOT NULL,  -- REQUIRED: Every account belongs to a client
 
     -- Platform mapping
-    platform_id VARCHAR(500),
+    platform_id VARCHAR(500) NOT NULL,
     platform_name VARCHAR(50) NOT NULL,
 
     -- Account details
@@ -296,17 +323,30 @@ CREATE TABLE accounts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT unique_account_code UNIQUE(organization_id, code)
+    -- Composite FK: client must belong to same organization (prevents cross-org)
+    CONSTRAINT fk_accounts_client
+        FOREIGN KEY (organization_id, client_id)
+        REFERENCES clients (organization_id, id)
+        ON DELETE CASCADE,
+
+    -- Idempotency: prevent duplicate syncs
+    CONSTRAINT ux_accounts_client_platform_idempotency
+        UNIQUE (client_id, platform_name, platform_id),
+
+    CONSTRAINT unique_account_code UNIQUE(client_id, code)
 );
 
 CREATE INDEX idx_accounts_org ON accounts(organization_id);
+CREATE INDEX idx_accounts_client ON accounts(client_id);
 CREATE INDEX idx_accounts_type ON accounts(account_type);
 CREATE INDEX idx_accounts_code ON accounts(code);
 ```
 
 **Notes:**
 - Maps to Xero Accounts and QB Account objects
-- Supports categorization
+- **Client-scoped**: Each client has independent Chart of Accounts
+- Composite FK prevents cross-org references
+- Idempotency uniqueness prevents sync retry duplicates
 - Essential for transaction mapping
 
 ---
@@ -654,6 +694,59 @@ LIMIT 10;
 
 ---
 
+## 🔐 ROW-LEVEL SECURITY & AUTH BYPASS
+
+### FORCE RLS Tables (Feb 2026)
+
+The following tables have FORCE RLS enabled, meaning even the table owner cannot bypass policies:
+
+| Table | Notes |
+|-------|-------|
+| `users` | Auth bypass via SECURITY DEFINER functions only |
+| `organizations` | Auth bypass via SECURITY DEFINER functions only |
+| `accounts` | Standard tenant isolation |
+| `clients` | Standard tenant isolation |
+| `transactions` | Standard tenant isolation |
+| `client_assignments` | Standard tenant isolation |
+| (and all other tenant tables) | |
+
+### SECURITY DEFINER Auth Functions
+
+These functions bypass RLS for authentication flows. They are:
+- Owned by `auth_definer` role (NOLOGIN)
+- Hardened with `SET search_path = pg_catalog, public`
+- Return minimal fields only
+- Execution restricted to app_user and app_admin
+
+```sql
+-- Login lookup (returns user credentials for password verification)
+auth_lookup_user_by_email(lookup_email TEXT)
+  -> (user_id, password_hash, user_status, organization_id, user_role, is_active)
+
+-- Registration lookup (check if org exists)
+auth_lookup_org_by_id(lookup_id UUID)
+  -> (org_id, org_name, org_status)
+
+-- Create pending user (registration)
+auth_create_pending_user(p_email TEXT, p_password_hash TEXT, p_name TEXT)
+  -> UUID (new user id)
+
+-- Activate user with organization (complete registration)
+auth_activate_user(p_user_id UUID, p_organization_id UUID)
+  -> BOOLEAN (success)
+```
+
+### Database Roles
+
+| Role | Purpose | Privileges |
+|------|---------|------------|
+| `app_user` | Normal application queries | SELECT/INSERT/UPDATE/DELETE with RLS |
+| `app_readonly` | Reporting/analytics | SELECT only with RLS |
+| `app_admin` | Administrative operations | All DML with RLS |
+| `auth_definer` | Auth function owner | SELECT on users/orgs, NOLOGIN |
+
+---
+
 ## 🚀 INITIAL DATA
 
 ### Sample Inserts for Testing
@@ -738,7 +831,9 @@ alembic upgrade head
 
 ---
 
-**Schema Status:** ✅ READY FOR IMPLEMENTATION
-**Last Updated:** November 23, 2025
-**Approved For:** Phase 1 and Beyond
+**Schema Status:** ✅ PRODUCTION HARDENED (FINAL_NON_NEGOTIABLE_DB_STANCE compliant)
+**Last Updated:** February 3, 2026
+**Current Migration:** v2_114_auth_security_definer
+**Schema Dump:** `/docs/schema_dump_v2_114.sql`
+**Approved For:** Phase 1 and Beyond + Financial SaaS Posture
 

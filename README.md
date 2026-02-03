@@ -11,7 +11,7 @@
 ### Current Session Instructions (February 3, 2026)
 
 1. **Read this entire README** - Understand current state and rules
-2. **Apply migrations** if not already done (includes Document Review tables and RLS):
+2. **Apply migrations** if not already done (includes DB hardening v2_110-v2_114):
    ```bash
    alembic upgrade head
    ```
@@ -19,9 +19,10 @@
    ```bash
    pytest tests/ -v
    ```
-4. **Review Session Notes**: `/docs/SESSION_NOTES/SESSION_NOTES_2026-02-02.md`
-5. **Current branch**: `feat/doc-review-ui` - Document Review UI and Claude OCR implemented
-6. **Next priorities**: Test Claude OCR with real invoices, then real OAuth or merge to master
+4. **Review Session Notes**: `/docs/SESSION_NOTES/SESSION_NOTES_2026-02-03.md`
+5. **Current branch**: `feat/doc-review-ui` - DB hardening complete, awaiting DBA sign-off
+6. **Database at**: `v2_114_auth_security_definer` - All FINAL_NON_NEGOTIABLE requirements met
+7. **Schema dump**: `/docs/schema_dump_v2_114.sql` - Sent to DBA for verification
 
 ### Session Workflow
 ```
@@ -82,8 +83,9 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 |-----------|--------|-------|
 | Backend | ✅ Complete | 903/903 tests passing |
 | Frontend | ✅ Phase 4C In Progress | Connected to PostgreSQL |
-| Database Schema | ✅ Hardened | Phase 4A complete (Jan 24, 2026) |
-| **Row-Level Security** | ✅ Complete | Phase 5 RLS policies (Feb 2, 2026) |
+| Database Schema | ✅ Hardened | Phase 4A + DB Hardening v2_114 (Feb 3, 2026) |
+| **DB Hardening** | ✅ Complete | FINAL_NON_NEGOTIABLE requirements met (Feb 3) |
+| **Row-Level Security** | ✅ Complete | FORCE RLS + SECURITY DEFINER auth (Feb 3) |
 | **Document Review UI** | ✅ Scaffolded | Upload, extract, review, submit workflow (Feb 2) |
 | **Claude OCR** | ⚠️ Implemented | Code complete, needs real invoice testing (Feb 2) |
 | Platform Adapters | ✅ Xero + QuickBooks | FreeAgent docs ready |
@@ -121,6 +123,13 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 - ✅ **Row-Level Security (RLS)** (Multi-tenant isolation enforced at database level) *(Feb 2)*
 - ✅ **Document Review UI** (Upload, OCR extraction, draft editing, submission workflow) *(Feb 2)*
 - ✅ **Claude Vision OCR Service** (AI-powered document extraction for invoices/bills/receipts) *(Feb 2)*
+- ✅ **Database Hardening v2_110-v2_114** (FINAL_NON_NEGOTIABLE_DB_STANCE requirements) *(Feb 3)*:
+  - accounts.client_id NOT NULL + composite FK to clients
+  - Idempotency uniqueness (client_id, platform_name, platform_id)
+  - accounting_platforms: oauth_client_id rename + managed_client_id
+  - Users pending invariant with CHECK constraints
+  - Case-insensitive email uniqueness
+  - SECURITY DEFINER auth functions + FORCE RLS on users/organizations
 
 ### In Progress
 - 🔄 Phase 4C: Backend Integration (~95% complete)
@@ -148,6 +157,7 @@ What should be the focus for the next phase of work?
 | **F. Performance** | Query optimization, caching, load testing | Medium |
 | **G. Test OCR** | Test Claude OCR with real invoices/receipts | Low |
 | **H. Merge Branch** | Merge feat/doc-review-ui to master | Low |
+| ~~**I. DB Hardening**~~ | ✅ Complete (Feb 3) - FINAL_NON_NEGOTIABLE requirements met | ~~High~~ |
 
 ### Subcontractor Reports (Reviewed)
 Documents in `/docs/READ ME NEXT/`:
@@ -188,8 +198,21 @@ What defines "complete" for Phase 4C before moving to Phase 6 (Beta)?
 
 ### Phase 4A: Database Hardening ✅ COMPLETE
 **Goal**: Production-ready database before connecting frontend
-**Status**: Complete (January 24, 2026)
+**Status**: Complete (January 24, 2026) + Extended (February 3, 2026)
 **Priority**: MANDATORY before Phase 4B
+
+#### Database Hardening v2 (February 3, 2026) - FINAL_NON_NEGOTIABLE_DB_STANCE
+
+| Migration | Status | Description |
+|-----------|--------|-------------|
+| v2_095 | ✅ Applied | client_assignments with composite FKs |
+| v2_110 | ✅ Applied | accounts.client_id NOT NULL + composite FK + idempotency |
+| v2_111 | ✅ Applied | accounting_platforms: oauth_client_id + managed_client_id |
+| v2_112 | ✅ Applied | users pending invariant + CHECK constraints |
+| v2_113 | ✅ Applied | Case-insensitive email uniqueness |
+| v2_114 | ✅ Applied | SECURITY DEFINER auth functions + FORCE RLS |
+
+**Schema Dump**: `/docs/schema_dump_v2_114.sql` - Sent to DBA for sign-off
 
 #### Why This Is Required
 An external team audited the database architecture and identified critical issues that MUST be resolved before production use. Full documentation is in `/docs/DATABASE_ARCHITECTURE/`.
@@ -310,15 +333,17 @@ WHERE total_amount != amount + tax_amount;
 
 ---
 
-### Phase 5: Production Hardening ✅ COMPLETE (Feb 2, 2026)
+### Phase 5: Production Hardening ✅ COMPLETE (Feb 3, 2026)
 **Goal**: Security and compliance readiness
 
 #### Row-Level Security (RLS) ✅ COMPLETE
-- [x] Create database roles (app_user, app_readonly, app_admin)
+- [x] Create database roles (app_user, app_readonly, app_admin, auth_definer)
 - [x] Enable RLS on tenant-scoped tables (clients, transactions, accounts, etc.)
 - [x] Add tenant context functions to FastAPI (`set_tenant_context`, `get_db_for_user`)
 - [x] Create RLS-aware auth dependencies (`get_current_user_with_rls`)
 - [x] RLS policies on document tables (document_inbox_item, document_ocr_result, etc.)
+- [x] **FORCE RLS on users and organizations** (Feb 3)
+- [x] **SECURITY DEFINER auth functions** for login/registration bypass (Feb 3)
 - [ ] Migrate production to use app_user role (optional hardening)
 - [ ] Test tenant isolation thoroughly
 
@@ -568,7 +593,8 @@ When ending a session, create:
 
 ---
 
-**Last Updated**: February 3, 2026 (Session 5)
-**Updated By**: Claude Code - Committed Document Review UI, Claude OCR, and RLS to GitHub
+**Last Updated**: February 3, 2026 (Session 6)
+**Updated By**: Claude Code - Database hardening v2_110-v2_114 complete, schema dump sent for DBA sign-off
 **Branch**: `feat/doc-review-ui` (pushed to origin)
-**Next Priority**: Test Claude OCR with real invoices, then merge to master or proceed with real OAuth.
+**Database**: v2_114_auth_security_definer (FINAL_NON_NEGOTIABLE requirements met)
+**Next Priority**: Await DBA sign-off, then merge to master or proceed with real OAuth.
