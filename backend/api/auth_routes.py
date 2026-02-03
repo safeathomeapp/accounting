@@ -1,10 +1,11 @@
 """API routes for authentication.
 
 Provides REST endpoints for user login and authentication.
+Also provides the get_current_user_with_rls dependency for tenant-isolated routes.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple, Generator
 from datetime import datetime, timedelta
 import jwt
 
@@ -12,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.database import get_db
+from backend.database import get_db, set_tenant_context, SessionLocal
 from backend.config import settings
 from backend.models.user import User
 from backend.models.organization import Organization
@@ -68,7 +69,11 @@ def get_current_user(
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ) -> User:
-    """Dependency to get current authenticated user."""
+    """Dependency to get current authenticated user.
+
+    NOTE: This does NOT set RLS tenant context. Use get_current_user_with_rls()
+    for routes that need tenant isolation on the database session.
+    """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -86,6 +91,103 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
     return user
+
+
+def get_current_user_with_rls(
+    authorization: Optional[str] = Header(None),
+) -> Generator[Tuple[User, Session], None, None]:
+    """
+    Dependency that provides both the authenticated user AND a database session
+    with RLS tenant context properly set.
+
+    This is the RECOMMENDED dependency for all authenticated routes that access
+    tenant-scoped data. It ensures Row-Level Security is enforced.
+
+    Usage:
+        @app.get("/clients")
+        def list_clients(
+            auth: Tuple[User, Session] = Depends(get_current_user_with_rls)
+        ):
+            user, db = auth
+            return db.query(Client).all()  # Only returns this org's clients
+
+    Yields:
+        Tuple[User, Session]: The authenticated user and a tenant-scoped db session
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = authorization.replace("Bearer ", "")
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+        email = payload.get("email")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Create a new session
+    db = SessionLocal()
+    try:
+        # First, get the user (before RLS is set)
+        user = db.query(User).filter(User.email == email).first()
+        if not user or not user.is_active:
+            raise HTTPException(status_code=401, detail="User not found or inactive")
+
+        # Now set the RLS tenant context for this session
+        if user.organization_id:
+            set_tenant_context(db, user.organization_id)
+            logger.debug(f"RLS context set for user {user.email}, org {user.organization_id}")
+        else:
+            logger.warning(f"User {user.email} has no organization_id - RLS context not set")
+
+        yield user, db
+    finally:
+        db.close()
+
+
+def get_db_for_user(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+) -> Session:
+    """
+    Dependency that returns a database session with RLS context set based on
+    the authenticated user's organization.
+
+    This is a convenience dependency when you only need the db session and
+    can get the user separately or don't need user info.
+
+    Usage:
+        @app.get("/transactions")
+        def list_transactions(
+            db: Session = Depends(get_db_for_user),
+            current_user: User = Depends(get_current_user)
+        ):
+            return db.query(Transaction).all()  # RLS enforced
+
+    Returns:
+        Session: Database session with RLS tenant context set
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = authorization.replace("Bearer ", "")
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+        email = payload.get("email")
+        org_id_str = payload.get("organization_id")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Set RLS context from JWT payload (avoids extra DB query)
+    if org_id_str:
+        from uuid import UUID
+        set_tenant_context(db, UUID(org_id_str))
+        logger.debug(f"RLS context set from JWT for org {org_id_str}")
+
+    return db
 
 
 @router.post("/login", response_model=LoginResponse)

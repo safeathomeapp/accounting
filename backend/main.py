@@ -215,6 +215,7 @@ from backend.api.reports_routes import router as reports_router
 from backend.api.mobile_routes import router as mobile_router
 from backend.api.data_routes import router as data_router
 from backend.api.data_quality_routes import router as data_quality_router
+from backend.api.documents_routes import router as documents_router
 from backend.api import job_routes as job_routes_module
 
 app.include_router(auth_router, prefix="/api/v1")
@@ -226,6 +227,7 @@ app.include_router(analytics_router)
 app.include_router(reports_router)
 app.include_router(mobile_router)
 app.include_router(data_quality_router)
+app.include_router(documents_router)
 
 
 @app.get("/api/v1/ai", tags=["AI"])

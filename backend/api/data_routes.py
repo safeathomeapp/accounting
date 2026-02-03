@@ -20,11 +20,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from pydantic import BaseModel, Field
 
-from backend.database import get_db
+from backend.database import get_db, set_tenant_context
 from backend.models.organization import Organization
 from backend.models.client import Client
 from backend.models.transaction import Transaction
 from backend.models.account import Account
+from backend.api.auth_routes import get_current_user
+from backend.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -187,17 +189,18 @@ def get_organization(
 @router.get("/clients")
 def list_clients(
     db: Session = Depends(get_db),
-    org_id: Optional[UUID] = None,
+    current_user: User = Depends(get_current_user),
     contact_type: Optional[str] = None,
     search: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
 ):
-    """List clients with optional filtering."""
-    query = db.query(Client).filter(Client.is_active == True)
+    """List clients with optional filtering. Requires authentication."""
+    # Set RLS tenant context for this session
+    set_tenant_context(db, current_user.organization_id)
 
-    if org_id:
-        query = query.filter(Client.organization_id == org_id)
+    # Now query - RLS will automatically filter to this org's clients
+    query = db.query(Client).filter(Client.is_active == True)
 
     if contact_type:
         query = query.filter(Client.contact_type == contact_type)

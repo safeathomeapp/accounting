@@ -367,7 +367,9 @@ class TestReportGenerator:
         start = date(2025, 1, 1)
         end = date(2025, 12, 31)
 
-        report = generator.generate_profit_loss(start, end)
+        # Patch _has_facts to return False so it uses the raw transactions fallback path
+        with patch.object(generator, '_has_facts', return_value=False):
+            report = generator.generate_profit_loss(start, end)
 
         assert report.period_start == start
         assert report.period_end == end
@@ -414,7 +416,9 @@ class TestReportGenerator:
 
         as_of = date(2025, 12, 31)
 
-        report = generator.generate_balance_sheet(as_of)
+        # Patch _has_facts to return False so it uses the raw transactions fallback path
+        with patch.object(generator, '_has_facts', return_value=False):
+            report = generator.generate_balance_sheet(as_of)
 
         assert report.as_of_date == as_of
         assert isinstance(report, BalanceSheet)
@@ -450,23 +454,24 @@ class TestReportGenerator:
                 return [Mock(total_amount=Decimal("100000.00"))]
             return []
 
-        # Patch get_transactions to avoid complex nested mocking
-        with patch.object(generator, 'get_transactions', side_effect=mock_get_transactions):
-            with patch.object(generator, 'generate_profit_loss') as mock_pl:
-                mock_pl_report = ProfitLossReport(
-                    period_start=start,
-                    period_end=end,
-                    organization_id=org_id,
-                    net_income=Decimal("25000.00"),
-                )
-                mock_pl.return_value = mock_pl_report
+        # Patch _has_facts to return False, get_transactions, and generate_profit_loss
+        with patch.object(generator, '_has_facts', return_value=False):
+            with patch.object(generator, 'get_transactions', side_effect=mock_get_transactions):
+                with patch.object(generator, 'generate_profit_loss') as mock_pl:
+                    mock_pl_report = ProfitLossReport(
+                        period_start=start,
+                        period_end=end,
+                        organization_id=org_id,
+                        net_income=Decimal("25000.00"),
+                    )
+                    mock_pl.return_value = mock_pl_report
 
-                report = generator.generate_cash_flow(start, end)
+                    report = generator.generate_cash_flow(start, end)
 
-                assert report.period_start == start
-                assert report.period_end == end
-                assert isinstance(report, CashFlowStatement)
-                assert report.net_income == Decimal("25000.00")
+                    assert report.period_start == start
+                    assert report.period_end == end
+                    assert isinstance(report, CashFlowStatement)
+                    assert report.net_income == Decimal("25000.00")
 
     @patch('backend.reporting.generators.Organization')
     def test_generate_trial_balance(self, mock_org_class):

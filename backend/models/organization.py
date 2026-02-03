@@ -60,6 +60,7 @@ class Organization(Base):
         ai_analysis_results: AI analysis results
         sync_history: Synchronization history
         audit_log: Audit trail
+        document_inbox_items: Uploaded documents awaiting review
 
     Example:
         >>> org = Organization(
@@ -157,6 +158,11 @@ class Organization(Base):
     audit_log = relationship(
         "AuditLog",
         back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    document_inbox_items = relationship(
+        "DocumentInboxItem",
         cascade="all, delete-orphan",
         lazy="select"
     )

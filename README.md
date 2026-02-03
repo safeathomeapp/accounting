@@ -8,14 +8,19 @@
 
 **This section is updated each session. Follow these steps before doing ANY work:**
 
-### Current Session Instructions (January 26, 2026)
+### Current Session Instructions (February 2, 2026)
 
 1. **Read this entire README** - Understand current state and rules
-2. **Review pending documents** in `/docs/READ ME NEXT/`:
-   - `Canonical_Data_Mapping_and_Reporting_Conformity_v1.md`
-   - `Engineering_and_Data_Rules_of_the_Road.md`
-3. **Discuss priorities with user** before starting work - see "NEXT SESSION: Discussion Required" section below
-4. **Update this section** at end of session with next session's instructions
+2. **Apply RLS migration** if not already done:
+   ```bash
+   alembic upgrade head
+   ```
+3. **Run tests** to verify nothing broke:
+   ```bash
+   pytest tests/ -v
+   ```
+4. **Review Session Notes**: `/docs/SESSION_NOTES/SESSION_NOTES_2026-02-02.md`
+5. **Next priorities**: AI OCR integration or real OAuth (see discussion section)
 
 ### Session Workflow
 ```
@@ -68,15 +73,16 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 
 ---
 
-## Current State (January 26, 2026)
+## Current State (February 2, 2026)
 
-### You Are Here: Month 6, Phase 4C In Progress
+### You Are Here: Month 6, Phase 5 Started (RLS Complete)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Backend | ✅ Complete | 903/903 tests passing |
 | Frontend | ✅ Phase 4C In Progress | Connected to PostgreSQL |
 | Database Schema | ✅ Hardened | Phase 4A complete (Jan 24, 2026) |
+| **Row-Level Security** | ✅ Complete | Phase 5 RLS policies (Feb 2, 2026) |
 | Platform Adapters | ✅ Xero + QuickBooks | FreeAgent docs ready |
 | Multi-Tenant Auth | ✅ Complete | JWT + Registration + Org scoping |
 | Client Hub | ✅ Complete | HomePage + ClientDetail pages |
@@ -109,12 +115,14 @@ START → Read README → Review pending docs → Discuss priorities → Do work
 - ✅ **Canonical data mapping layer** (MappingEngine, cashflow_facts_v1, quarantine, coverage dashboard) *(Jan 27)*
 - ✅ **Data quality dashboard** (coverage stats, quarantine management, mapping CRUD) *(Jan 27)*
 - ✅ **CRUD UI forms** (Modal, FormField, ConfirmDialog components + Client/Transaction create/edit/delete) *(Jan 28)*
+- ✅ **Row-Level Security (RLS)** (Multi-tenant isolation enforced at database level) *(Feb 2)*
 
 ### In Progress
 - 🔄 Phase 4C: Backend Integration (~90% complete)
 - ⏳ FreeAgent platform adapter (docs complete, awaiting API sandbox)
 - 📋 Client/End-user reporting (subcontractor docs pending review)
 - 📋 Platform canonical mappings needed: FreeAgent, ClearBooks, FreshBooks (see `docs/PLATFORM_ONBOARDING.md`)
+- 📋 AI OCR integration for document review (stub exists, needs real AI)
 
 ---
 
@@ -296,10 +304,12 @@ WHERE total_amount != amount + tax_amount;
 ### Phase 5: Production Hardening (Month 7)
 **Goal**: Security and compliance readiness
 
-#### Row-Level Security (RLS)
-- [ ] Create database roles (app_user, app_readonly, app_admin)
-- [ ] Enable RLS on tenant-scoped tables
-- [ ] Modify FastAPI to set session context
+#### Row-Level Security (RLS) ✅ COMPLETE (Feb 2, 2026)
+- [x] Create database roles (app_user, app_readonly, app_admin)
+- [x] Enable RLS on tenant-scoped tables
+- [x] Add tenant context functions to FastAPI
+- [x] Create RLS-aware auth dependencies
+- [ ] Migrate production to use app_user role (optional hardening)
 - [ ] Test tenant isolation thoroughly
 
 #### Data Retention Implementation
@@ -541,6 +551,6 @@ When ending a session, create:
 
 ---
 
-**Last Updated**: January 27, 2026 (Session 3)
-**Updated By**: Claude Code - Canonical data mapping layer, data quality dashboard, platform onboarding docs
-**Next Priority**: Platform canonical mappings for FreeAgent, ClearBooks, FreshBooks when APIs are connected. See `docs/PLATFORM_ONBOARDING.md`.
+**Last Updated**: February 2, 2026 (Session 4)
+**Updated By**: Claude Code - Row-Level Security (RLS) implementation for multi-tenant isolation
+**Next Priority**: AI OCR integration OR real OAuth (depending on API key status). See session notes.

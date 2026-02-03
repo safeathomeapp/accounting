@@ -14,6 +14,7 @@ import AccountsList from './pages/AccountsList'
 import SyncMonitor from './pages/SyncMonitor'
 import Settings from './pages/Settings'
 import DataQuality from './pages/DataQuality'
+import DocumentReview from './pages/DocumentReview'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore()
@@ -107,6 +108,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <DataQuality />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/documents/review"
+            element={
+              <ProtectedRoute>
+                <DocumentReview />
               </ProtectedRoute>
             }
           />

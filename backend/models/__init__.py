@@ -50,6 +50,9 @@ from backend.models.analytics import (
     Forecast, FinancialMetric, TrendAnalysis, KPI, DashboardWidget,
     ForecastType, ForecastMethod, MetricType, TrendDirection
 )
+from backend.models.document import (
+    DocumentInboxItem, DocumentOCRResult, DocumentDraft, DocumentDraftLine
+)
 
 # Canonical mapping layer models are imported directly from backend.canonical.models
 # to avoid circular imports (canonical models import Base from this package).
@@ -90,4 +93,8 @@ __all__ = [
     "ForecastMethod",
     "MetricType",
     "TrendDirection",
+    "DocumentInboxItem",
+    "DocumentOCRResult",
+    "DocumentDraft",
+    "DocumentDraftLine",
 ]

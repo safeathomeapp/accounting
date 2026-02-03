@@ -146,6 +146,50 @@ export const accountsAPI = {
 }
 
 // ============================================================================
+// DOCUMENT REVIEW API
+// ============================================================================
+
+const documentsBaseRaw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const documentsBase = documentsBaseRaw.includes('/api/v1')
+  ? documentsBaseRaw.replace('/api/v1', '/api')
+  : `${documentsBaseRaw.replace(/\/$/, '')}/api`
+const documentsApi = axios.create({
+  baseURL: documentsBase,
+  headers: { 'Content-Type': 'application/json' },
+})
+documentsApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+documentsApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('authToken')
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export const documentsAPI = {
+  upload: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return documentsApi.post('/inbox/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  extract: (inboxItemId) => documentsApi.post(`/inbox/${inboxItemId}/extract`),
+  getDraft: (draftId) => documentsApi.get(`/drafts/${draftId}`),
+  saveDraft: (draftId, data) => documentsApi.patch(`/drafts/${draftId}`, data),
+  submitDraft: (draftId, data) => documentsApi.post(`/drafts/${draftId}/submit`, data),
+}
+
+// ============================================================================
 // DATA QUALITY API
 // ============================================================================
 
