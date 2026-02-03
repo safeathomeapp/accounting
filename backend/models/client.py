@@ -168,6 +168,11 @@ class Client(Base):
         back_populates="client",
         lazy="select"
     )
+    assignments = relationship(
+        "ClientAssignment",
+        back_populates="client",
+        lazy="select"
+    )
 
     # Composite index for platform reference uniqueness
     __table_args__ = (

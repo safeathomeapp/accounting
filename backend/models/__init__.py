@@ -9,6 +9,7 @@ Models defined:
 - Organization: Practice/organization information
 - AccountingPlatform: Xero/QB configuration
 - Client: Customers/contacts
+- ClientAssignment: User-to-client workflow assignments
 - Transaction: Financial transactions
 - Account: Chart of accounts
 - OAuthToken: OAuth token storage
@@ -53,6 +54,7 @@ from backend.models.analytics import (
 from backend.models.document import (
     DocumentInboxItem, DocumentOCRResult, DocumentDraft, DocumentDraftLine
 )
+from backend.models.client_assignment import ClientAssignment
 
 # Canonical mapping layer models are imported directly from backend.canonical.models
 # to avoid circular imports (canonical models import Base from this package).
@@ -97,4 +99,5 @@ __all__ = [
     "DocumentOCRResult",
     "DocumentDraft",
     "DocumentDraftLine",
+    "ClientAssignment",
 ]

@@ -85,8 +85,14 @@ class User(Base):
     )
     last_login = Column(DateTime(timezone=True), nullable=True)
 
-    # Relationship
+    # Relationships
     organization = relationship("Organization", lazy="select")
+    client_assignments = relationship(
+        "ClientAssignment",
+        foreign_keys="ClientAssignment.user_id",
+        back_populates="user",
+        lazy="select"
+    )
 
     def set_password(self, password: str) -> None:
         """Hash and set the user's password."""
