@@ -268,20 +268,105 @@ export default function DocumentReview() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <section className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Document Preview</h2>
-            {inboxItem?.file_url ? (
-              <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden h-[540px]">
-                <iframe
-                  title="document-preview"
-                  src={inboxItem.file_url}
-                  className="w-full h-full"
-                />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-[540px] border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-gray-500 dark:text-gray-400">
-                {uploading ? 'Uploading...' : 'Upload a document to preview'}
-              </div>
-            )}
-            {inboxItem?.file_name && (
+            {(() => {
+              // Only show preview after extraction is complete and we have a valid URL
+              const canPreview = draft && inboxItem?.file_url
+              const isImage = inboxItem?.mime_type?.startsWith('image/')
+              const isPdf = inboxItem?.mime_type === 'application/pdf'
+
+              if (uploading) {
+                return (
+                  <div className="flex items-center justify-center h-[540px] border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-gray-500 dark:text-gray-400">
+                    <div className="text-center">
+                      <svg className="animate-spin h-8 w-8 mx-auto mb-2 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Uploading...</span>
+                    </div>
+                  </div>
+                )
+              }
+
+              if (!inboxItem) {
+                // No file uploaded - show drag and drop area
+                return (
+                  <label className="flex flex-col items-center justify-center h-[540px] border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <div className="text-center">
+                      <svg className="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">Drag and drop a file here</p>
+                      <p className="text-gray-500 dark:text-gray-500 text-sm mt-1">or click to browse</p>
+                      <p className="text-gray-400 dark:text-gray-600 text-xs mt-3">PDF, JPG, PNG up to 10MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                    />
+                  </label>
+                )
+              }
+
+              if (inboxItem && !draft) {
+                // File uploaded but not yet extracted - show file info
+                return (
+                  <div className="flex flex-col items-center justify-center h-[540px] border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/30">
+                    <div className="text-center">
+                      <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="text-gray-700 dark:text-gray-300 font-medium">{inboxItem.file_name}</p>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{inboxItem.mime_type}</p>
+                      <p className="text-blue-600 dark:text-blue-400 text-sm mt-4">Click "Run Extraction" to process</p>
+                    </div>
+                  </div>
+                )
+              }
+
+              if (canPreview && isImage) {
+                // Show image preview
+                return (
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden h-[540px] flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+                    <img
+                      src={inboxItem.file_url}
+                      alt={inboxItem.file_name}
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  </div>
+                )
+              }
+
+              if (canPreview && isPdf) {
+                // Show PDF preview
+                return (
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden h-[540px]">
+                    <iframe
+                      title="document-preview"
+                      src={inboxItem.file_url}
+                      className="w-full h-full"
+                    />
+                  </div>
+                )
+              }
+
+              // Draft exists but file type not previewable
+              return (
+                <div className="flex flex-col items-center justify-center h-[540px] border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/30">
+                  <div className="text-center">
+                    <svg className="w-16 h-16 mx-auto mb-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-gray-700 dark:text-gray-300 font-medium">{inboxItem?.file_name}</p>
+                    <p className="text-green-600 dark:text-green-400 text-sm mt-2">Extraction complete</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">Preview not available for this file type</p>
+                  </div>
+                </div>
+              )
+            })()}
+            {inboxItem?.file_name && draft && (
               <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
                 {inboxItem.file_name}
               </p>
