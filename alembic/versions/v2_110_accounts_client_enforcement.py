@@ -64,7 +64,7 @@ def upgrade() -> None:
     # =========================================================================
 
     op.execute("""
-        CREATE UNIQUE INDEX CONCURRENTLY ux_accounts_client_platform_idempotency
+        CREATE UNIQUE INDEX ux_accounts_client_platform_idempotency
         ON accounts (client_id, platform_name, platform_id);
     """)
 

@@ -48,7 +48,7 @@ def upgrade() -> None:
     # =========================================================================
 
     op.execute("""
-        CREATE UNIQUE INDEX CONCURRENTLY ux_users_email_lower
+        CREATE UNIQUE INDEX ux_users_email_lower
         ON users (lower(email));
     """)
 

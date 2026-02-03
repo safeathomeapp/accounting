@@ -36,11 +36,13 @@ def upgrade() -> None:
     """)
 
     # users: UNIQUE (organization_id, id) for composite FK
-    # Note: organization_id can be NULL during registration, so we use a partial unique
+    # Note: organization_id can be NULL during registration, but that's OK:
+    # - The id is already unique (PK), so (org_id, id) pairs are naturally unique
+    # - NULL org_id rows won't match FK lookups (FKs require non-NULL values)
+    # - Assignments only reference users with org_id (active users)
     op.execute("""
-        CREATE UNIQUE INDEX uq_users_org_id
-        ON users (organization_id, id)
-        WHERE organization_id IS NOT NULL;
+        ALTER TABLE users
+        ADD CONSTRAINT uq_users_org_id UNIQUE (organization_id, id);
     """)
 
     # =========================================================================
@@ -192,5 +194,5 @@ def downgrade() -> None:
     op.execute("DROP TABLE IF EXISTS client_assignments;")
 
     # Remove composite unique constraints from parent tables
-    op.execute("DROP INDEX IF EXISTS uq_users_org_id;")
+    op.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS uq_users_org_id;")
     op.execute("ALTER TABLE clients DROP CONSTRAINT IF EXISTS uq_clients_org_id;")
