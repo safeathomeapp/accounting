@@ -55,6 +55,7 @@ from backend.models.document import (
     DocumentInboxItem, DocumentOCRResult, DocumentDraft, DocumentDraftLine
 )
 from backend.models.client_assignment import ClientAssignment
+from backend.models.contact import Contact
 
 # Canonical mapping layer models are imported directly from backend.canonical.models
 # to avoid circular imports (canonical models import Base from this package).
@@ -100,4 +101,5 @@ __all__ = [
     "DocumentDraft",
     "DocumentDraftLine",
     "ClientAssignment",
+    "Contact",
 ]

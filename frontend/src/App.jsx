@@ -119,6 +119,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/client/:clientId/documents/review"
+            element={
+              <ProtectedRoute>
+                <DocumentReview />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/" element={<Navigate to={isAuthenticated ? "/home" : "/login"} replace />} />
           <Route path="*" element={<Navigate to={isAuthenticated ? "/home" : "/login"} replace />} />
         </Routes>

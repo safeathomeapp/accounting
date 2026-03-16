@@ -173,6 +173,12 @@ class Client(Base):
         back_populates="client",
         lazy="select"
     )
+    contacts = relationship(
+        "Contact",
+        back_populates="client",
+        lazy="select",
+        cascade="all, delete-orphan"
+    )
 
     # Composite index for platform reference uniqueness
     __table_args__ = (

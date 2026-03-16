@@ -25,6 +25,7 @@ from backend.models.organization import Organization
 from backend.models.client import Client
 from backend.models.transaction import Transaction
 from backend.models.account import Account
+from backend.models.contact import Contact
 from backend.api.auth_routes import get_current_user
 from backend.models.user import User
 
@@ -893,3 +894,191 @@ def get_dashboard_summary(
         "syncStatus": "Connected",
         "lastSync": org.updated_at.isoformat() if org.updated_at else None,
     }
+
+
+# ============================================================================
+# CONTACTS (Vendors/Customers for Clients)
+# ============================================================================
+
+class ContactCreate(BaseModel):
+    """Schema for creating a contact."""
+    name: str
+    contact_type: str = "vendor"  # vendor, customer, both
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    website: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+    tax_number: Optional[str] = None
+    payment_terms: Optional[str] = None
+    default_nominal_code: Optional[str] = None
+    currency: Optional[str] = "GBP"
+    notes: Optional[str] = None
+
+
+@router.get("/clients/{client_id}/contacts")
+def list_client_contacts(
+    client_id: UUID,
+    db: Session = Depends(get_db),
+    contact_type: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """
+    List all contacts for a specific client.
+
+    Contacts are vendors/customers that the client transacts with.
+    Use for fuzzy matching during OCR extraction.
+    """
+    # Verify client exists
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    query = db.query(Contact).filter(
+        Contact.client_id == client_id,
+        Contact.is_active == True
+    )
+
+    if contact_type:
+        query = query.filter(Contact.contact_type == contact_type)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(Contact.name.ilike(search_term))
+
+    total = query.count()
+    contacts = query.order_by(Contact.name).offset(skip).limit(limit).all()
+
+    return {
+        "client": {
+            "id": str(client.id),
+            "name": client.name,
+        },
+        "contacts": [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "contact_type": c.contact_type,
+                "email": c.email,
+                "phone": c.phone,
+                "website": c.website,
+                "address_line1": c.address_line1,
+                "address_line2": c.address_line2,
+                "city": c.city,
+                "postal_code": c.postal_code,
+                "country": c.country,
+                "tax_number": c.tax_number,
+                "payment_terms": c.payment_terms,
+                "default_nominal_code": c.default_nominal_code,
+                "currency": c.currency,
+                "is_active": c.is_active,
+            }
+            for c in contacts
+        ],
+        "count": len(contacts),
+        "total": total,
+    }
+
+
+@router.get("/contacts/{contact_id}")
+def get_contact(
+    contact_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Get a single contact by ID."""
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    return {
+        "id": str(contact.id),
+        "client_id": str(contact.client_id),
+        "organization_id": str(contact.organization_id),
+        "name": contact.name,
+        "contact_type": contact.contact_type,
+        "email": contact.email,
+        "phone": contact.phone,
+        "website": contact.website,
+        "address_line1": contact.address_line1,
+        "address_line2": contact.address_line2,
+        "city": contact.city,
+        "postal_code": contact.postal_code,
+        "country": contact.country,
+        "tax_number": contact.tax_number,
+        "payment_terms": contact.payment_terms,
+        "default_nominal_code": contact.default_nominal_code,
+        "currency": contact.currency,
+        "notes": contact.notes,
+        "is_active": contact.is_active,
+        "created_at": contact.created_at.isoformat() if contact.created_at else None,
+        "updated_at": contact.updated_at.isoformat() if contact.updated_at else None,
+    }
+
+
+@router.post("/clients/{client_id}/contacts")
+def create_contact(
+    client_id: UUID,
+    data: ContactCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new contact for a client."""
+    # Verify client exists and get org_id
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    contact = Contact(
+        id=uuid_module.uuid4(),
+        client_id=client_id,
+        organization_id=client.organization_id,
+        name=data.name,
+        contact_type=data.contact_type,
+        email=data.email,
+        phone=data.phone,
+        website=data.website,
+        address_line1=data.address_line1,
+        address_line2=data.address_line2,
+        city=data.city,
+        postal_code=data.postal_code,
+        country=data.country,
+        tax_number=data.tax_number,
+        payment_terms=data.payment_terms,
+        default_nominal_code=data.default_nominal_code,
+        currency=data.currency,
+        notes=data.notes,
+    )
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+
+    return {
+        "id": str(contact.id),
+        "name": contact.name,
+        "contact_type": contact.contact_type,
+        "message": "Contact created successfully",
+    }
+
+
+@router.delete("/contacts/{contact_id}")
+def delete_contact(
+    contact_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a contact (soft delete by setting is_active=False)."""
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    contact.is_active = False
+    db.commit()
+
+    return {"message": "Contact deleted successfully"}

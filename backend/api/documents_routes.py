@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -84,6 +84,7 @@ def _draft_to_dict(draft: DocumentDraft, inbox_item: Optional[DocumentInboxItem]
     return {
         "id": str(draft.id),
         "inbox_item_id": str(draft.inbox_item_id),
+        "client_id": str(draft.client_id) if draft.client_id else None,
         "status": draft.status,
         "doc_type_guess": draft.doc_type_guess,
         "doc_type_confirmed": draft.doc_type_confirmed,
@@ -125,6 +126,7 @@ def _draft_to_dict(draft: DocumentDraft, inbox_item: Optional[DocumentInboxItem]
                 "mime_type": inbox_item.mime_type,
                 "status": inbox_item.status,
                 "file_url": f"/api/inbox/{inbox_item.id}/file",
+                "client_id": str(inbox_item.client_id) if inbox_item.client_id else None,
             }
             if inbox_item
             else None
@@ -290,6 +292,7 @@ def _is_claude_available() -> bool:
 @router.post("/inbox/upload")
 def upload_document(
     file: UploadFile = File(...),
+    client_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -306,6 +309,7 @@ def upload_document(
     inbox_item = DocumentInboxItem(
         org_id=current_user.organization_id,
         uploaded_by_user_id=current_user.id,
+        client_id=client_id if client_id else None,
         source_type="upload",
         file_name=file.filename,
         mime_type=file.content_type,
@@ -322,6 +326,7 @@ def upload_document(
         "file_name": inbox_item.file_name,
         "mime_type": inbox_item.mime_type,
         "file_url": f"/api/inbox/{inbox_item.id}/file",
+        "client_id": client_id,
     }
 
 
@@ -439,10 +444,14 @@ def extract_document_endpoint(
         draft = DocumentDraft(
             inbox_item_id=inbox_item.id,
             org_id=current_user.organization_id,
+            client_id=inbox_item.client_id,
             status="draft",
         )
         db.add(draft)
         db.flush()
+    elif not draft.client_id and inbox_item.client_id:
+        # Update client_id if it was set on inbox item but not on draft
+        draft.client_id = inbox_item.client_id
 
     draft.doc_type_guess = draft_data["doc_type"]
     draft.counterparty_guess = draft_data["counterparty_name"]
@@ -456,7 +465,7 @@ def extract_document_endpoint(
     }
     draft.totals_confirmed = draft.totals_guess
     draft.draft_json = {
-        "source": "stub",
+        "source": "claude-ocr",
         "header": {
             "doc_type": draft_data["doc_type"],
             "counterparty_name": draft_data["counterparty_name"],
@@ -464,8 +473,13 @@ def extract_document_endpoint(
             "due_date": draft_data["due_date"].isoformat() if draft_data["due_date"] else None,
             "currency": draft_data["currency"],
             "invoice_no": draft_data["invoice_no"],
+            "order_no": draft_data.get("order_no"),
+            "payment_terms": draft_data.get("payment_terms"),
+            "payment_status": draft_data.get("payment_status"),
             "totals": draft.totals_guess,
         },
+        "vendor": draft_data.get("vendor"),
+        "customer": draft_data.get("customer"),
         "lines": [
             {
                 "line_no": line["line_no"],
@@ -481,6 +495,8 @@ def extract_document_endpoint(
             }
             for line in draft_data["lines"]
         ],
+        "raw_text": draft_data.get("raw_text"),
+        "confidence": str(draft_data.get("confidence")) if draft_data.get("confidence") else None,
     }
     draft.validation_json = validation
     draft.last_edited_by = current_user.id

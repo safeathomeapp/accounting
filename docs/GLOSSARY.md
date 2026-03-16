@@ -66,11 +66,99 @@
 
 ---
 
+### Contact
+- **What**: A vendor, customer, or supplier that a Client transacts with. The counterparty on bills and sales invoices.
+- **Examples**: "Crouchers Orchards" (vendor sending a bill to a Client), "Smith & Partners LLP" (customer of a Client)
+- **DB Table**: `contacts`
+- **Code**: `Contact` model
+- **Key fields**: `client_id`, `organization_id`, `name`, `contact_type`
+- **Contact Types**: `vendor` (AP), `customer` (AR), `both` (AP+AR)
+- **Purpose**: Fuzzy matching during OCR extraction, sync with accounting software contact databases
+
+**AP/AR Direction**:
+| `contact_type` | Ledger | Meaning | They appear on... |
+|---|---|---|---|
+| `vendor` | **Accounts Payable (AP)** | They send us bills, we pay them | Bills, purchase orders |
+| `customer` | **Accounts Receivable (AR)** | We send them sales invoices, they pay us | Sales invoices, estimates |
+| `both` | **AP + AR** | Trades in both directions | Either document type |
+
+**Platform Term Mapping** (our canonical `contact_type` maps to each platform's terminology):
+| Our Term | Xero | QuickBooks | FreeAgent | Sage |
+|---|---|---|---|---|
+| `vendor` | Contact (supplier) | Vendor | Supplier | Supplier |
+| `customer` | Contact (customer) | Customer | Client | Customer |
+| `both` | Contact (both) | — | — | — |
+
+**Domain Model Hierarchy**:
+```
+Organization (accounting firm)
+└── Client (business whose books we manage)
+    └── Contact (vendors/customers that Client deals with)
+        ├── vendor (AP) → appears on bills
+        └── customer (AR) → appears on sales invoices
+```
+
+**NOT**: The Client itself. A Client is our customer (the business we manage). A Contact is THEIR customer or vendor.
+
+**NOT**: "Vendor" or "Supplier" in isolation - use "Contact" as the canonical term since it can be either vendor OR customer. The `contact_type` field distinguishes direction.
+
+---
+
 ### Transaction
-- **What**: A financial transaction (invoice, bill, payment, etc.)
+- **What**: A financial transaction (bill, sales invoice, payment, etc.)
 - **DB Table**: `transactions`
 - **Code**: `Transaction` model
 - **Key fields**: `client_id`, `organization_id`, `platform_id`
+
+---
+
+## 1b. Canonical Document Types
+
+The word "invoice" is **ambiguous** in common usage - it could mean a bill (AP) or a sales invoice (AR). We resolve this by never using the bare word "invoice" in code or API. Every document type has an explicit AP/AR direction.
+
+**Rule**: Always use the canonical term in code, database columns, API fields, and conversation. If someone says "invoice", ask: "AP or AR?"
+
+### AP Documents (Accounts Payable - we owe money)
+
+| Canonical Term | Code Enum | What It Is | Contact Direction |
+|---|---|---|---|
+| `bill` | `BILL` | A vendor sent this to our Client. Client owes vendor money. | vendor (AP) |
+| `credit_note_received` | `CREDIT_NOTE_RECEIVED` | A vendor credited our Client. Reduces amount owed. | vendor (AP) |
+| `purchase_order` | `PURCHASE_ORDER` | An order our Client sent to a vendor. Pre-purchase. | vendor (AP) |
+| `payment_made` | `PAYMENT_MADE` | Our Client paid a vendor. Settles a bill. | vendor (AP) |
+
+### AR Documents (Accounts Receivable - money owed to us)
+
+| Canonical Term | Code Enum | What It Is | Contact Direction |
+|---|---|---|---|
+| `sales_invoice` | `SALES_INVOICE` | Our Client sent this to a customer. Customer owes Client money. | customer (AR) |
+| `credit_note_issued` | `CREDIT_NOTE_ISSUED` | Our Client credited a customer. Reduces amount they owe. | customer (AR) |
+| `estimate` | `ESTIMATE` | A quote our Client sent to a customer. Pre-sale. | customer (AR) |
+| `payment_received` | `PAYMENT_RECEIVED` | A customer paid our Client. Settles a sales invoice. | customer (AR) |
+
+### Platform Document Type Mapping
+
+Each accounting platform uses different names for the same concepts. Our mapping layer translates to canonical terms.
+
+| Our Canonical Term | Xero | QuickBooks | FreeAgent | Sage |
+|---|---|---|---|---|
+| `bill` | Bill | Bill | Bill | Purchase Invoice |
+| `sales_invoice` | Invoice | Invoice | Invoice | Sales Invoice |
+| `credit_note_received` | Credit Note (from contact) | Vendor Credit | — | Purchase Credit Note |
+| `credit_note_issued` | Credit Note (to contact) | Credit Memo | — | Sales Credit Note |
+| `estimate` | Quote | Estimate | Estimate | Quotation |
+| `purchase_order` | Purchase Order | Purchase Order | — | Purchase Order |
+| `payment_made` | Payment (spend) | Bill Payment | — | Purchase Payment |
+| `payment_received` | Payment (receive) | Payment | — | Sales Receipt |
+
+### Document Type Determination from OCR
+
+When the AI extracts a document, the document type can usually be inferred from:
+1. **Document header text**: "INVOICE", "BILL", "CREDIT NOTE", "ESTIMATE", "QUOTE"
+2. **Contact direction**: If the contact is a `vendor`, the document is likely AP (bill). If `customer`, likely AR (sales_invoice).
+3. **Our Client's position**: Is our Client the buyer or the seller on this document?
+
+**Key rule**: If OCR detects "INVOICE" in the header, check the contact direction to determine if it's a `bill` (AP) or `sales_invoice` (AR). Never store the bare type "invoice".
 
 ---
 
@@ -261,7 +349,8 @@ if client.organization_id != current_user.organization_id:
 | v2_080-v2_089 | Document review |
 | v2_090-v2_099 | RLS and auth |
 | v2_100-v2_114 | DB hardening v2 (FINAL_NON_NEGOTIABLE) |
-| v2_115+ | Future |
+| v2_115-v2_116 | Client-scoped documents + contacts |
+| v2_117+ | Future |
 
 ### Key Migrations (v2_110-v2_114)
 | Migration | Description |
@@ -272,6 +361,8 @@ if client.organization_id != current_user.organization_id:
 | v2_112 | users pending invariant + CHECK constraints |
 | v2_113 | Case-insensitive email uniqueness |
 | v2_114 | SECURITY DEFINER auth functions + FORCE RLS |
+| v2_115 | client_id on document_inbox_item + document_draft |
+| v2_116 | contacts table with RLS + composite FKs |
 
 ---
 
@@ -285,6 +376,8 @@ if client.organization_id != current_user.organization_id:
 | RLS | Row-Level Security | Everywhere |
 | PK | Primary Key | Documentation only |
 | UUID | Universally Unique Identifier | Everywhere |
+| AP | Accounts Payable | Everywhere - money our Client owes to vendors |
+| AR | Accounts Receivable | Everywhere - money owed to our Client by customers |
 
 **Rule**: Don't abbreviate in table/column names. `organization_id` not `org_id` (except legacy).
 
@@ -300,6 +393,12 @@ if client.organization_id != current_user.organization_id:
 | `account` (ambiguous) | `chart_account` or context-specific |
 | Comments explaining what | Comments explaining why |
 | `getUserClients()` | `getClientsForUser()` or `user.clients` |
+| `invoice` (ambiguous - AP or AR?) | `bill` (AP) or `sales_invoice` (AR) |
+| `type = "invoice"` in code/DB | `document_type = "bill"` or `document_type = "sales_invoice"` |
+| `credit_note` (ambiguous direction) | `credit_note_received` (AP) or `credit_note_issued` (AR) |
+| `payment` (ambiguous direction) | `payment_made` (AP) or `payment_received` (AR) |
+| `vendor` as a model name | `Contact` with `contact_type = "vendor"` |
+| `supplier` in code | `Contact` with `contact_type = "vendor"` |
 
 ---
 
@@ -315,7 +414,7 @@ When you introduce a new term:
 
 ---
 
-**Last Updated**: February 3, 2026
+**Last Updated**: February 5, 2026
 **Maintainer**: Engineering Team
 
 ---

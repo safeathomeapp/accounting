@@ -50,6 +50,12 @@ class DocumentInboxItem(Base):
         nullable=True,
         index=True,
     )
+    client_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("clients.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     source_type = Column(String(50), nullable=False, default="upload")
     file_name = Column(String(255), nullable=False)
     mime_type = Column(String(100), nullable=True)
@@ -78,6 +84,7 @@ class DocumentInboxItem(Base):
         lazy="select",
     )
     uploaded_by = relationship("User", lazy="select")
+    client = relationship("Client", lazy="select")
 
 
 class DocumentOCRResult(Base):
@@ -126,6 +133,12 @@ class DocumentDraft(Base):
         nullable=False,
         index=True,
     )
+    client_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("clients.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     status = Column(String(50), nullable=False, default="draft", index=True)
     doc_type_guess = Column(String(50), nullable=True)
     doc_type_confirmed = Column(String(50), nullable=True)
@@ -170,6 +183,8 @@ class DocumentDraft(Base):
         lazy="select",
     )
     organization = relationship("Organization", lazy="select")
+    client = relationship("Client", foreign_keys=[client_id], lazy="select")
+    counterparty = relationship("Client", foreign_keys=[counterparty_id], lazy="select")
     last_editor = relationship("User", foreign_keys=[last_edited_by], lazy="select")
     submitter = relationship("User", foreign_keys=[submitted_by], lazy="select")
 

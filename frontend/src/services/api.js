@@ -120,6 +120,10 @@ export const clientsAPI = {
   update: (id, data) => api.put(`/clients/${id}`, data),
   delete: (id) => api.delete(`/clients/${id}`),
   getAccounts: (clientId, params = {}) => api.get(`/clients/${clientId}/accounts`, { params }),
+  // Contacts (vendors/customers for this client)
+  getContacts: (clientId, params = {}) => api.get(`/clients/${clientId}/contacts`, { params }),
+  createContact: (clientId, data) => api.post(`/clients/${clientId}/contacts`, data),
+  deleteContact: (contactId) => api.delete(`/contacts/${contactId}`),
 }
 
 // ============================================================================
@@ -176,9 +180,12 @@ documentsApi.interceptors.response.use(
 )
 
 export const documentsAPI = {
-  upload: (file) => {
+  upload: (file, clientId = null) => {
     const formData = new FormData()
     formData.append('file', file)
+    if (clientId) {
+      formData.append('client_id', clientId)
+    }
     return documentsApi.post('/inbox/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })

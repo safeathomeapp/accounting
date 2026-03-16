@@ -46,50 +46,75 @@ class ClaudeOCRService:
     SUPPORTED_PDF_TYPE = "application/pdf"
 
     # Extraction prompt for invoices/bills/receipts
-    EXTRACTION_PROMPT = """Analyze this document image and extract the following information as structured JSON.
+    EXTRACTION_PROMPT = """Analyze this document and extract the following information as structured JSON.
 
 The document is likely an invoice, bill, receipt, or similar financial document.
 
 Extract and return a JSON object with this exact structure:
 {
     "doc_type": "invoice" | "bill" | "receipt" | "credit_note" | "unknown",
-    "counterparty_name": "Company or person name on document",
+    "vendor": {
+        "name": "The VENDOR/SUPPLIER/SELLER company name - look at the LETTERHEAD, LOGO, or company name at TOP of document. This is the business that ISSUED the invoice. Do NOT use invoice reference numbers or customer names.",
+        "address_line1": "First line of vendor address or null",
+        "address_line2": "Second line of vendor address or null",
+        "city": "Vendor city or null",
+        "postcode": "Vendor postcode/ZIP or null",
+        "country": "Vendor country or null",
+        "vat_number": "Vendor VAT/Tax registration number or null",
+        "phone": "Vendor phone number or null",
+        "email": "Vendor email address or null",
+        "website": "Vendor website or null"
+    },
+    "customer": {
+        "name": "The customer/buyer name - who the invoice is addressed TO",
+        "address_line1": "First line of customer address or null",
+        "address_line2": "Second line of customer address or null",
+        "city": "Customer city or null",
+        "postcode": "Customer postcode/ZIP or null",
+        "country": "Customer country or null",
+        "reference": "Customer reference/account number if shown or null"
+    },
     "doc_date": "YYYY-MM-DD format or null if not found",
-    "due_date": "YYYY-MM-DD format or null if not found",
+    "due_date": "YYYY-MM-DD format or null if not found (look for 'due date', 'payment due', 'balance due by')",
     "currency": "3-letter currency code like GBP, USD, EUR",
-    "invoice_no": "Invoice/reference number or null",
+    "invoice_no": "Invoice number, reference number, or order number - look for 'Invoice #', 'Inv No', 'Reference', 'Order #'",
+    "order_no": "Order/PO number if different from invoice number, or null",
+    "payment_terms": "Payment terms if shown (e.g., 'Net 30', '14 days') or null",
+    "payment_status": "paid | unpaid | partial | null",
     "totals": {
-        "net": "Net amount as decimal string",
+        "net": "Net/subtotal amount BEFORE VAT/tax as decimal string",
         "vat": "VAT/tax amount as decimal string",
-        "gross": "Gross/total amount as decimal string"
+        "gross": "Gross/total amount INCLUDING VAT as decimal string - this is the final 'Total' or 'Amount Due'"
     },
     "lines": [
         {
             "line_no": 1,
-            "description": "Item description",
-            "qty": "Quantity as decimal string",
-            "unit_price": "Unit price as decimal string",
-            "net": "Line net amount as decimal string",
+            "description": "Item/service description",
+            "qty": "Quantity as decimal string (default 1 if not shown)",
+            "unit_price": "Unit price EXCLUDING VAT as decimal string",
+            "net": "Line net amount (qty * unit_price) as decimal string",
             "vat": "Line VAT amount as decimal string or 0.00",
-            "gross": "Line gross amount as decimal string",
-            "vat_code": "VAT rate code if visible (e.g., 'VAT20', 'ZERO', 'EXEMPT') or null",
+            "gross": "Line gross amount (net + vat) as decimal string",
+            "vat_code": "VAT rate: 'VAT20' for 20%, 'VAT5' for 5%, 'VAT0' or 'ZERO' for 0%, 'EXEMPT' for exempt",
             "nominal_code": null,
-            "confidence": "0.00 to 1.00 as decimal string"
+            "confidence": "0.00 to 1.00 - how confident you are in this line's data"
         }
     ],
-    "raw_text": "Any relevant text or notes from the document",
-    "confidence": "Overall extraction confidence 0.00 to 1.00 as decimal string"
+    "raw_text": "Any additional relevant text, notes, or payment details from the document",
+    "confidence": "Overall extraction confidence 0.00 to 1.00"
 }
 
-Important rules:
-1. All numeric amounts should be strings with 2 decimal places (e.g., "100.00")
-2. If you cannot find a value, use null (not empty string)
-3. If line items are not visible, include at least one line with the totals
-4. For UK documents, assume GBP unless stated otherwise
-5. VAT is typically 20% in UK, 0% for exempt items
-6. Return ONLY the JSON object, no other text
+CRITICAL RULES:
+1. VENDOR NAME = The company in the LETTERHEAD/LOGO at the TOP of the document. This is who ISSUED/SENT the invoice. NOT the invoice reference, NOT the customer name.
+2. CUSTOMER NAME = The person/company in "Bill To", "Invoice To", "Att:", or similar - who the invoice is addressed TO.
+3. All amounts as strings with 2 decimal places (e.g., "100.00", "0.00")
+4. If you cannot find a value, use null (not empty string)
+5. For UK: default GBP, standard VAT is 20%
+6. gross = net + vat (verify this adds up)
+7. Invoice reference/ref fields are NOT vendor names - they are reference numbers
+8. Return ONLY the JSON object, no other text
 
-Analyze the document now:"""
+Extract the data now:"""
 
     def __init__(self, api_key: Optional[str] = None):
         """
@@ -287,13 +312,45 @@ Analyze the document now:"""
                 "confidence": Decimal("0.70"),
             })
 
+        # Extract vendor details (new format) or fall back to counterparty_name (old format)
+        vendor_raw = data.get("vendor") or {}
+        vendor = {
+            "name": vendor_raw.get("name") or data.get("counterparty_name") or "Unknown",
+            "address_line1": vendor_raw.get("address_line1"),
+            "address_line2": vendor_raw.get("address_line2"),
+            "city": vendor_raw.get("city"),
+            "postcode": vendor_raw.get("postcode"),
+            "country": vendor_raw.get("country"),
+            "vat_number": vendor_raw.get("vat_number"),
+            "phone": vendor_raw.get("phone"),
+            "email": vendor_raw.get("email"),
+            "website": vendor_raw.get("website"),
+        }
+
+        # Extract customer details
+        customer_raw = data.get("customer") or {}
+        customer = {
+            "name": customer_raw.get("name") or data.get("customer_name"),
+            "address_line1": customer_raw.get("address_line1"),
+            "address_line2": customer_raw.get("address_line2"),
+            "city": customer_raw.get("city"),
+            "postcode": customer_raw.get("postcode"),
+            "country": customer_raw.get("country"),
+            "reference": customer_raw.get("reference"),
+        }
+
         return {
             "doc_type": doc_type,
-            "counterparty_name": data.get("counterparty_name") or "Unknown",
+            "counterparty_name": vendor["name"],  # Keep for backward compat
+            "vendor": vendor,
+            "customer": customer,
             "doc_date": self._parse_date(data.get("doc_date")) or date.today(),
             "due_date": self._parse_date(data.get("due_date")),
             "currency": (data.get("currency") or "GBP").upper()[:3],
             "invoice_no": data.get("invoice_no"),
+            "order_no": data.get("order_no"),
+            "payment_terms": data.get("payment_terms"),
+            "payment_status": data.get("payment_status"),
             "totals": totals,
             "lines": lines,
             "raw_text": data.get("raw_text") or "",
