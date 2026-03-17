@@ -148,6 +148,16 @@ class Contact(Base):
         "Organization",
         lazy="select"
     )
+    supplier_aliases = relationship(
+        "ClientSupplierAlias",
+        back_populates="contact",
+        lazy="select",
+    )
+    accounting_patterns = relationship(
+        "ClientAccountingPattern",
+        back_populates="contact",
+        lazy="select",
+    )
 
     # Indexes
     __table_args__ = (

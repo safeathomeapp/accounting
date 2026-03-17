@@ -1,119 +1,117 @@
 # OCR / Document Review Readme
 
-This file captures the current state of the document intake / OCR stub / document review feature so you can test it next session.
+This file captures the current implemented document pipeline state on `feat/doc-review-ui`.
 
-## Repo state (as of this session)
+## Current Canonical Flow
 
-- Branch: `feat/doc-review-ui`
-- No `AGENTS.md` found under `C:\Users\kevth\Desktop\Projects\Accountancy`
+- Client-centric ingestion only. There is no active generic `/api/v1/ai` or clientless document route.
+- The canonical frontend route is `/client/:clientId/documents/review`.
+- Upload creates a client-scoped `document_inbox_item`.
+- Extraction runs through the shared backend orchestration service in `backend/services/document_processing.py`.
+- OCR remains extraction-only. Interpretation now adds read-only client-aware suggestions from contacts and client intelligence where available.
+- Successful submit now writes conservative confirmed outcomes back into the client intelligence layer.
+- Confirmed counterparty resolution is explicit via a client-scoped confirmed contact path.
+- Review is still mandatory. Nothing auto-posts to the ledger.
 
-### What exists now
+## Backend State
 
-Backend (FastAPI + Postgres + Alembic):
-- Models: `backend/models/document.py`
-- Migration: `alembic/versions/v2_080_document_review_tables.py`
-- API routes: `backend/api/documents_routes.py`
-- Router mounted at `/api` in `backend/main.py`
-
-Frontend (React + Vite + Tailwind):
-- Page: `frontend/src/pages/DocumentReview.jsx`
-- Route: `/documents/review` in `frontend/src/App.jsx`
-- Navigation link: `frontend/src/components/Navigation.jsx`
-- API client: `frontend/src/services/api.js`
-
-Tests:
-- `tests/test_documents_validation.py` (totals validation)
-
-## Database schema (summary)
-
-Tables are org-scoped for RLS readiness.
-
-### `document_inbox_item`
-- `org_id`, `uploaded_by_user_id`
-- `source_type`, `file_name`, `mime_type`, `file_path`, `checksum_hash`
-- `status`, `created_at`, `updated_at`
-
-### `document_ocr_result`
-- `inbox_item_id`, `org_id`
-- `ocr_engine`, `raw_text`, `layout_json` (nullable), `pages`, `created_at`
-
-### `document_draft`
-- `inbox_item_id`, `org_id`
-- guesses/confirmed fields: `doc_type`, `counterparty`, `doc_date`, `currency`, `invoice_no`, `totals`
-- `draft_json`, `validation_json`
-- `last_edited_by`, `submitted_by`, `status`, timestamps
-
-### `document_draft_line`
-- `draft_id`, `org_id`, `line_no`
-- `description_guess/confirmed`
-- `qty`, `unit_price`, `net`, `vat`, `gross`
-- `vat_code_guess/confirmed`, `nominal_code_guess/confirmed`
-- `confidence`
-
-## API endpoints (current)
-
-All are under `/api`:
-
-- `POST /api/inbox/upload`
-  - Stores file on disk (dev), creates `document_inbox_item`.
-- `GET /api/inbox/{id}/file`
-  - Streams the uploaded file from disk.
-- `POST /api/inbox/{id}/extract`
-  - Stub extraction: creates `document_ocr_result` and draft data.
-  - Writes `document_draft` + `document_draft_line`.
-  - Calculates validation issues and stores `validation_json`.
-- `GET /api/drafts/{draft_id}`
-  - Returns draft + lines + inbox item info.
-- `PATCH /api/drafts/{draft_id}`
-  - Saves edits, recalculates totals validation, updates lines.
-- `POST /api/drafts/{draft_id}/submit`
-  - Locks draft as `submitted`, stores validation JSON,
-  - Creates/updates internal placeholder `Transaction` record.
-
-## Frontend flow (current)
-
-Route: `/documents/review`
-
-Flow:
-1) Upload a file (calls `/api/inbox/upload`)
-2) Click “Run Extraction” (calls `/api/inbox/{id}/extract`)
-3) Review/edit draft fields and lines
-4) Save or Submit
-
-Right pane includes:
-- Header fields (doc type, counterparty, date, currency, invoice no, due date)
-- Totals (net/vat/gross) + validation indicator
-- Line items grid with VAT code + nominal code
-- Actions: Save Draft, Submit
-
-Left pane is a file preview iframe.
-
-## Tests/build run in this session
-
-- `python -m pytest tests/test_documents_validation.py -q`
-- `npm run build` in `frontend/`
-
-Note: Vite warns that `baseline-browser-mapping` data is 2+ months old. This is non-fatal.
-
-## How to test next session
-
-1) Apply migrations:
-   - `alembic upgrade head`
-2) Run backend:
-   - `uvicorn backend.main:app --reload`
-3) Run frontend:
-   - `npm run dev` in `frontend/`
-4) Go to `/documents/review`
-5) Upload a PDF or image → Run Extraction → Review & Save/Submit
-
-## Key files (for quick access)
-
-- `backend/models/document.py`
-- `alembic/versions/v2_080_document_review_tables.py`
+Implemented components:
 - `backend/api/documents_routes.py`
-- `backend/main.py`
-- `frontend/src/pages/DocumentReview.jsx`
-- `frontend/src/services/api.js`
-- `frontend/src/App.jsx`
-- `frontend/src/components/Navigation.jsx`
-- `tests/test_documents_validation.py`
+  - `POST /api/inbox/upload`
+  - `GET /api/inbox/{id}/file`
+  - `POST /api/inbox/{id}/extract`
+  - `GET /api/drafts/{draft_id}`
+  - `PATCH /api/drafts/{draft_id}`
+  - `POST /api/drafts/{draft_id}/submit`
+- `backend/services/document_processing.py`
+  - shared orchestration path for route and worker
+  - owns inbox status transitions, OCR persistence, and draft persistence
+- `backend/services/client_intelligence.py`
+  - read-only contact alias and accounting-pattern lookup service
+  - builds explainable suggestion payloads
+- `backend/services/client_intelligence_writeback.py`
+  - conservative write-back on successful submit only
+  - upserts safe alias/pattern signals and appends audit events
+- `backend/workers/process_documents.py`
+  - background worker that calls the same shared processing service
+
+## Data Flow
+
+1. Upload stores the file and creates `document_inbox_item`.
+2. Extraction loads the inbox item, verifies `client_id`, verifies file presence, and sets processing status.
+3. OCR runs via the configured OCR service.
+4. OCR evidence is stored in `document_ocr_result`.
+5. A `document_draft` and `document_draft_line` set are created or refreshed.
+6. Client-aware suggestions are attached to `draft_json["suggestions"]`.
+7. User review confirms a client-scoped contact via `confirmed_contact_id` when appropriate.
+8. User submission remains the decision point for confirmed values and conservative write-back.
+
+## Suggestion Payload
+
+Suggestions are stored in `document_draft.draft_json["suggestions"]` and are read-only in this pass.
+
+Current shape:
+
+```json
+{
+  "contact": {
+    "suggested_id": "uuid-or-null",
+    "suggested_name": "string-or-null",
+    "confidence": "high|medium|low",
+    "reasons": ["deterministic explanation"]
+  },
+  "nominal_account": {
+    "suggested_id": "uuid-or-null",
+    "suggested_code": "string-or-null",
+    "suggested_name": "string-or-null",
+    "confidence": "high|medium|low",
+    "reasons": ["deterministic explanation"]
+  },
+  "document_type": {
+    "suggested_value": "string-or-null",
+    "confidence": "high|medium|low",
+    "reasons": ["deterministic explanation"]
+  },
+  "tax_code": {
+    "suggested_value": "string-or-null",
+    "confidence": "high|medium|low",
+    "reasons": ["deterministic explanation"]
+  }
+}
+```
+
+These suggestions do not overwrite confirmed values. They are advisory review inputs.
+
+Confirmed contact is separate:
+- OCR supplier text stays in the extracted draft path
+- suggested contact stays in `draft_json["suggestions"]["contact"]`
+- reviewer-confirmed contact is stored explicitly on the draft and submit payload
+- legacy `counterparty_id` is no longer part of the active document review contract
+
+## Matching Rules Implemented
+
+- Exact normalized alias match in `client_supplier_alias`
+- Exact normalized client contact-name fallback
+- Read-only `client_accounting_pattern` lookup using matched contact and/or document type
+- Fallback to no suggestion when there is no safe client-specific match
+
+Successful submit now performs conservative, review-led write-back. It does not learn from OCR-only extraction or partial draft saves.
+
+## Current Limitations
+
+- No `document_repository` table exists.
+- No approved-document table exists.
+- No autonomous or aggressive learning exists.
+- No automatic posting exists.
+- Background processing and API extraction share orchestration, but suggestions remain advisory only.
+
+## Key Files
+
+- `backend/api/documents_routes.py`
+- `backend/services/document_processing.py`
+- `backend/services/client_intelligence.py`
+- `backend/workers/process_documents.py`
+- `backend/models/document.py`
+- `backend/models/client_intelligence.py`
+- `tests/test_document_processing_service.py`
+- `tests/test_client_intelligence_service.py`

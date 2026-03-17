@@ -143,9 +143,9 @@ class DocumentDraft(Base):
     doc_type_guess = Column(String(50), nullable=True)
     doc_type_confirmed = Column(String(50), nullable=True)
     counterparty_guess = Column(String(255), nullable=True)
-    counterparty_id = Column(
+    confirmed_contact_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("clients.id", ondelete="SET NULL"),
+        ForeignKey("contacts.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -184,7 +184,7 @@ class DocumentDraft(Base):
     )
     organization = relationship("Organization", lazy="select")
     client = relationship("Client", foreign_keys=[client_id], lazy="select")
-    counterparty = relationship("Client", foreign_keys=[counterparty_id], lazy="select")
+    confirmed_contact = relationship("Contact", foreign_keys=[confirmed_contact_id], lazy="select")
     last_editor = relationship("User", foreign_keys=[last_edited_by], lazy="select")
     submitter = relationship("User", foreign_keys=[submitted_by], lazy="select")
 

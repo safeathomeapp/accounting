@@ -29,7 +29,7 @@ Created: November 23, 2025
 Last Modified: November 23, 2025
 """
 
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -37,7 +37,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 from backend.config import settings
-from backend.database import SessionLocal, get_db
+from backend.database import SessionLocal
 from backend.sync import SyncScheduler
 
 # Configure logging
@@ -199,7 +199,6 @@ async def api_v1_root() -> Dict[str, Any]:
             "transactions": "/api/v1/transactions",
             "accounts": "/api/v1/accounts",
             "sync": "/api/v1/sync",
-            "ai": "/api/v1/ai",
         },
         "docs": "/api/v1/docs",
     }
@@ -228,25 +227,6 @@ app.include_router(reports_router)
 app.include_router(mobile_router)
 app.include_router(data_quality_router)
 app.include_router(documents_router)
-
-
-@app.get("/api/v1/ai", tags=["AI"])
-async def ai_analysis(db=Depends(get_db)) -> Dict[str, Any]:
-    """
-    AI analysis endpoints.
-
-    Currently a placeholder. Will be implemented in Phase 2.
-
-    Args:
-        db: Database session (dependency injection)
-
-    Returns:
-        AI analysis information
-    """
-    return {
-        "message": "AI analysis endpoint - Coming soon",
-        "status": "placeholder",
-    }
 
 
 # ============================================================================

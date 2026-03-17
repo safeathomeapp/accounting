@@ -56,6 +56,12 @@ from backend.models.document import (
 )
 from backend.models.client_assignment import ClientAssignment
 from backend.models.contact import Contact
+from backend.models.client_intelligence import (
+    ClientIntelligenceProfile,
+    ClientSupplierAlias,
+    ClientAccountingPattern,
+    ClientIntelligenceEvent,
+)
 
 # Canonical mapping layer models are imported directly from backend.canonical.models
 # to avoid circular imports (canonical models import Base from this package).
@@ -102,4 +108,8 @@ __all__ = [
     "DocumentDraftLine",
     "ClientAssignment",
     "Contact",
+    "ClientIntelligenceProfile",
+    "ClientSupplierAlias",
+    "ClientAccountingPattern",
+    "ClientIntelligenceEvent",
 ]

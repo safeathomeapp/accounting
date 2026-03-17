@@ -808,7 +808,14 @@ export default function DocumentReview() {
   // Extracted vendor/contact details from OCR
   const [extractedVendor, setExtractedVendor] = useState(null)
 
-  // Fetch client data and accounts when clientId is present
+  useEffect(() => {
+    if (!clientId) {
+      addToast('Select a client to start document review.', 'error')
+      navigate('/home', { replace: true })
+    }
+  }, [addToast, clientId, navigate])
+
+  // Fetch client data and accounts for the current client context
   useEffect(() => {
     if (clientId) {
       fetchClientContext()
@@ -859,15 +866,18 @@ export default function DocumentReview() {
         .sort((a, b) => b.score - a.score)
         .slice(0, 5)
       setContactMatches(matches)
-
-      // Auto-select if very high confidence match
-      if (matches.length > 0 && matches[0].score > 0.95) {
-        setSelectedContact(matches[0])
-      }
     } else {
       setContactMatches([])
     }
   }, [form.counterparty_name, contacts])
+
+  useEffect(() => {
+    if (!draft?.confirmed_contact_id || contacts.length === 0) return
+    const confirmed = contacts.find((contact) => contact.id === draft.confirmed_contact_id)
+    if (confirmed) {
+      setSelectedContact(confirmed)
+    }
+  }, [contacts, draft?.confirmed_contact_id])
 
   // Click outside to close contact dropdown
   useEffect(() => {
@@ -1021,7 +1031,7 @@ export default function DocumentReview() {
 
     setUploading(true)
     try {
-      const uploadResponse = await documentsAPI.upload(file, clientId || null)
+      const uploadResponse = await documentsAPI.upload(file, clientId)
       const uploadData = uploadResponse.data
       setInboxItem({
         id: uploadData.inbox_item_id,
@@ -1048,6 +1058,7 @@ export default function DocumentReview() {
       const extractedDraft = extractResponse.data.draft
       setDraft(extractedDraft)
       setInboxItem(extractedDraft.inbox_item)
+      setSelectedContact(extractedDraft.confirmed_contact || null)
 
       // Extract confidence data from draft_json if available
       const headerConfidence = extractedDraft.draft_json?.confidence || {}
@@ -1079,7 +1090,7 @@ export default function DocumentReview() {
 
       setForm({
         doc_type: normalizedDocType,
-        counterparty_name: extractedDraft.counterparty_guess || '',
+        counterparty_name: extractedDraft.confirmed_counterparty_name || extractedDraft.counterparty_guess || '',
         doc_date: resolvedDocDate,
         due_date: resolvedDueDate,
         currency: extractedDraft.currency_confirmed || extractedDraft.currency_guess || 'GBP',
@@ -1237,7 +1248,7 @@ export default function DocumentReview() {
   const buildPayload = () => ({
     doc_type: form.doc_type || null,
     counterparty_name: form.counterparty_name || null,
-    counterparty_id: selectedContact?.id || null,
+    confirmed_contact_id: selectedContact?.id || null,
     doc_date: form.doc_date || null,
     due_date: form.due_date || null,
     currency: form.currency || null,
@@ -1270,6 +1281,7 @@ export default function DocumentReview() {
       const response = await documentsAPI.saveDraft(draft.id, buildPayload())
       setDraft(response.data.draft)
       setInboxItem(response.data.draft.inbox_item)
+      setSelectedContact(response.data.draft.confirmed_contact || null)
       addToast('Draft saved', 'success')
     } catch (error) {
       console.error(error)
@@ -1286,6 +1298,7 @@ export default function DocumentReview() {
       const response = await documentsAPI.submitDraft(draft.id, buildPayload())
       setDraft(response.data.draft)
       setInboxItem(response.data.draft.inbox_item)
+      setSelectedContact(response.data.draft.confirmed_contact || null)
       addToast('Draft submitted (internal transaction created)', 'success')
     } catch (error) {
       console.error(error)
@@ -1296,12 +1309,7 @@ export default function DocumentReview() {
   }
 
   const handleClose = () => {
-    // If we're in client context, navigate back to client page
-    if (clientId) {
-      navigate(`/client/${clientId}`)
-      return
-    }
-    // Otherwise reset state to start fresh
+    navigate(`/client/${clientId}`)
     setDraft(null)
     setInboxItem(null)
     setForm({
@@ -1375,7 +1383,7 @@ export default function DocumentReview() {
             )}
 
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">
-              {clientId ? 'AI Document OCR' : 'Document Review'}
+              Client Document Review
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-center mb-8">
               Upload a document to begin AI-powered extraction
@@ -1467,7 +1475,7 @@ export default function DocumentReview() {
             </button>
             <div>
               <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {inboxItem?.file_name || 'Document Review'}
+                {inboxItem?.file_name || 'Client Document Review'}
               </h1>
               <div className="flex items-center gap-2 text-sm">
                 {client && (
@@ -1738,7 +1746,7 @@ export default function DocumentReview() {
                   Contact (Vendor/Customer)
                   {selectedContact && (
                     <span className="ml-2 text-green-600 dark:text-green-400 text-xs">
-                      (Matched: {selectedContact.name})
+                      (Confirmed: {selectedContact.name})
                     </span>
                   )}
                 </label>

@@ -63,16 +63,6 @@ export default function Navigation() {
               Dashboard
             </Link>
             <Link
-              to="/documents/review"
-              className={`px-4 py-2 rounded-lg transition ${
-                isActive('/documents/review')
-                  ? 'bg-blue-600'
-                  : 'hover:bg-gray-700'
-              }`}
-            >
-              Documents
-            </Link>
-            <Link
               to="/sync"
               className={`px-4 py-2 rounded-lg transition ${
                 isActive('/sync')

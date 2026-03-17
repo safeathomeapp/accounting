@@ -1,7 +1,6 @@
 """API routes for document intake, OCR, and draft review."""
 
 import hashlib
-import logging
 import os
 import shutil
 from datetime import date, datetime
@@ -17,14 +16,13 @@ from backend.database import get_db
 from backend.api.auth_routes import get_current_user
 from backend.models.document import (
     DocumentInboxItem,
-    DocumentOCRResult,
     DocumentDraft,
     DocumentDraftLine,
 )
+from backend.models.contact import Contact
 from backend.models.transaction import Transaction
-from backend.config import settings
-
-logger = logging.getLogger(__name__)
+from backend.services.client_intelligence_writeback import record_reviewed_outcome
+from backend.services.document_processing import process_inbox_item
 
 
 router = APIRouter(prefix="/api", tags=["documents"])
@@ -54,7 +52,7 @@ class DraftLinePayload(BaseModel):
 class DraftUpdatePayload(BaseModel):
     doc_type: Optional[str] = None
     counterparty_name: Optional[str] = None
-    counterparty_id: Optional[str] = None
+    confirmed_contact_id: Optional[str] = None
     doc_date: Optional[date] = None
     due_date: Optional[date] = None
     currency: Optional[str] = None
@@ -81,6 +79,7 @@ def _checksum_for_path(path: str) -> str:
 
 
 def _draft_to_dict(draft: DocumentDraft, inbox_item: Optional[DocumentInboxItem] = None) -> Dict[str, Any]:
+    confirmed_contact = draft.confirmed_contact
     return {
         "id": str(draft.id),
         "inbox_item_id": str(draft.inbox_item_id),
@@ -89,7 +88,17 @@ def _draft_to_dict(draft: DocumentDraft, inbox_item: Optional[DocumentInboxItem]
         "doc_type_guess": draft.doc_type_guess,
         "doc_type_confirmed": draft.doc_type_confirmed,
         "counterparty_guess": draft.counterparty_guess,
-        "counterparty_id": str(draft.counterparty_id) if draft.counterparty_id else None,
+        "confirmed_counterparty_name": ((draft.draft_json or {}).get("review") or {}).get("confirmed_counterparty_name"),
+        "confirmed_contact_id": str(draft.confirmed_contact_id) if draft.confirmed_contact_id else None,
+        "confirmed_contact": (
+            {
+                "id": str(confirmed_contact.id),
+                "name": confirmed_contact.name,
+                "contact_type": confirmed_contact.contact_type,
+            }
+            if confirmed_contact
+            else None
+        ),
         "doc_date_guess": draft.doc_date_guess.isoformat() if draft.doc_date_guess else None,
         "doc_date_confirmed": draft.doc_date_confirmed.isoformat() if draft.doc_date_confirmed else None,
         "currency_guess": draft.currency_guess,
@@ -132,6 +141,45 @@ def _draft_to_dict(draft: DocumentDraft, inbox_item: Optional[DocumentInboxItem]
             else None
         ),
     }
+
+
+def _existing_suggestions(draft: DocumentDraft) -> Dict[str, Any]:
+    draft_json = draft.draft_json or {}
+    suggestions = draft_json.get("suggestions")
+    return suggestions if isinstance(suggestions, dict) else {}
+
+
+def _observed_counterparty_name(draft: DocumentDraft) -> Optional[str]:
+    draft_json = draft.draft_json or {}
+    header = draft_json.get("header")
+    if isinstance(header, dict):
+        counterparty_name = header.get("counterparty_name")
+        if counterparty_name:
+            return counterparty_name
+    return draft.counterparty_guess
+
+
+def _resolve_confirmed_contact(
+    db: Session,
+    *,
+    draft: DocumentDraft,
+    organization_id: str,
+    requested_contact_id: Optional[str],
+) -> Optional[Contact]:
+    if not draft.client_id:
+        raise HTTPException(status_code=409, detail="Draft is missing client scope")
+    if not requested_contact_id:
+        return None
+
+    contact = db.query(Contact).filter(
+        Contact.id == requested_contact_id,
+        Contact.organization_id == organization_id,
+        Contact.client_id == draft.client_id,
+        Contact.is_active.is_(True),
+    ).first()
+    if contact is None:
+        raise HTTPException(status_code=400, detail="Confirmed contact must belong to the current client")
+    return contact
 
 
 def _validate_totals(lines: List[DraftLinePayload], totals: TotalsPayload) -> Dict[str, Any]:
@@ -189,110 +237,10 @@ def _validate_totals(lines: List[DraftLinePayload], totals: TotalsPayload) -> Di
     }
 
 
-def _generate_mock_draft(seed_text: str) -> Dict[str, Any]:
-    """Generate mock draft data when Claude OCR is unavailable (fallback)."""
-    seed = int(hashlib.sha256(seed_text.encode()).hexdigest()[:8], 16)
-    doc_types = ["invoice", "bill", "receipt"]
-    counterparties = [
-        "Harbor Supply Co.",
-        "Summit Office Ltd",
-        "Evergreen Logistics",
-        "Northwind Industrial",
-        "Brightline Services",
-    ]
-    descriptions = [
-        "Consulting services",
-        "Monthly hosting",
-        "Equipment rental",
-        "Office supplies",
-        "Implementation support",
-    ]
-
-    doc_type = doc_types[seed % len(doc_types)]
-    counterparty = counterparties[seed % len(counterparties)]
-    doc_number = f"INV-{1000 + (seed % 9000)}"
-    doc_date = date.today()
-    due_date = doc_date
-    currency = "GBP"
-
-    line_count = 2 + (seed % 3)
-    lines = []
-    totals = {"net": Decimal("0.00"), "vat": Decimal("0.00"), "gross": Decimal("0.00")}
-    for i in range(line_count):
-        qty = Decimal(str(1 + ((seed >> i) % 3)))
-        unit_price = Decimal(str(50 + ((seed >> (i + 3)) % 200)))
-        net = (qty * unit_price).quantize(Decimal("0.01"))
-        vat = (net * Decimal("0.20")).quantize(Decimal("0.01"))
-        gross = (net + vat).quantize(Decimal("0.01"))
-        totals["net"] += net
-        totals["vat"] += vat
-        totals["gross"] += gross
-        lines.append(
-            {
-                "line_no": i + 1,
-                "description": descriptions[(seed + i) % len(descriptions)],
-                "qty": qty,
-                "unit_price": unit_price,
-                "net": net,
-                "vat": vat,
-                "gross": gross,
-                "vat_code": "VAT20",
-                "nominal_code": "4000",
-                "confidence": Decimal("0.85"),
-            }
-        )
-
-    totals = {k: totals[k].quantize(Decimal("0.01")) for k in totals}
-
-    return {
-        "doc_type": doc_type,
-        "counterparty_name": counterparty,
-        "doc_date": doc_date,
-        "due_date": due_date,
-        "currency": currency,
-        "invoice_no": doc_number,
-        "totals": totals,
-        "lines": lines,
-        "ocr_engine": "stub-v1",
-        "raw_text": f"Mock extraction for testing (seed: {seed_text})",
-    }
-
-
-def _extract_with_claude(file_path: str, mime_type: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Extract document data using Claude Vision OCR.
-
-    Args:
-        file_path: Path to the document file
-        mime_type: MIME type of the file
-
-    Returns:
-        Extracted document data
-
-    Raises:
-        Exception: If extraction fails
-    """
-    from backend.services.claude_ocr import extract_document, ClaudeOCRError
-
-    try:
-        result = extract_document(file_path, mime_type)
-        result["ocr_engine"] = f"claude-{settings.claude_model}"
-        result["raw_text"] = result.get("raw_text", "")
-        return result
-    except ClaudeOCRError as e:
-        logger.error(f"Claude OCR failed: {e}")
-        raise
-
-
-def _is_claude_available() -> bool:
-    """Check if Claude API is configured and available."""
-    return bool(settings.claude_api_key)
-
-
 @router.post("/inbox/upload")
 def upload_document(
     file: UploadFile = File(...),
-    client_id: Optional[str] = Form(None),
+    client_id: str = Form(...),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -309,7 +257,7 @@ def upload_document(
     inbox_item = DocumentInboxItem(
         org_id=current_user.organization_id,
         uploaded_by_user_id=current_user.id,
-        client_id=client_id if client_id else None,
+        client_id=client_id,
         source_type="upload",
         file_name=file.filename,
         mime_type=file.content_type,
@@ -359,175 +307,17 @@ def extract_document_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """
-    Extract structured data from an uploaded document using Claude Vision OCR.
-
-    Falls back to mock data if Claude API is not configured or extraction fails.
-    """
-    inbox_item = db.query(DocumentInboxItem).filter(
-        DocumentInboxItem.id == inbox_item_id,
-        DocumentInboxItem.org_id == current_user.organization_id,
-    ).first()
-    if not inbox_item:
-        raise HTTPException(status_code=404, detail="Inbox item not found")
-
-    # Try Claude OCR first, fall back to mock
-    ocr_engine = "stub-v1"
-    extraction_error = None
-
-    if _is_claude_available():
-        try:
-            logger.info(f"Attempting Claude OCR extraction for inbox item {inbox_item_id}")
-            draft_data = _extract_with_claude(inbox_item.file_path, inbox_item.mime_type)
-            ocr_engine = draft_data.get("ocr_engine", f"claude-{settings.claude_model}")
-            logger.info(f"Claude OCR extraction successful for inbox item {inbox_item_id}")
-        except Exception as e:
-            extraction_error = str(e)
-            logger.warning(f"Claude OCR failed, falling back to mock: {e}")
-            draft_data = _generate_mock_draft(str(inbox_item.id))
-    else:
-        logger.info("Claude API not configured, using mock extraction")
-        draft_data = _generate_mock_draft(str(inbox_item.id))
-
-    totals = TotalsPayload(**draft_data["totals"])
-    validation = _validate_totals(
-        [
-            DraftLinePayload(
-                line_no=line["line_no"],
-                description=line["description"],
-                qty=line["qty"],
-                unit_price=line["unit_price"],
-                net=line["net"],
-                vat=line["vat"],
-                gross=line["gross"],
-                vat_code=line.get("vat_code"),
-                nominal_code=line.get("nominal_code"),
-                confidence=line.get("confidence"),
-            )
-            for line in draft_data["lines"]
-        ],
-        totals,
+    result = process_inbox_item(
+        db,
+        inbox_item_id,
+        organization_id=current_user.organization_id,
+        actor_user_id=current_user.id,
+        allow_mock_fallback=True,
     )
+    if not result.success or result.draft is None or result.inbox_item is None:
+        raise HTTPException(status_code=result.http_status, detail=result.error_message)
 
-    # Store OCR result
-    raw_text = draft_data.get("raw_text", "")
-    existing_ocr = db.query(DocumentOCRResult).filter(
-        DocumentOCRResult.inbox_item_id == inbox_item.id
-    ).first()
-    if existing_ocr:
-        existing_ocr.ocr_engine = ocr_engine
-        existing_ocr.raw_text = raw_text
-        existing_ocr.layout_json = {
-            "pages": 1,
-            "extraction_source": ocr_engine,
-            "extraction_error": extraction_error,
-        }
-        existing_ocr.pages = 1
-    else:
-        db.add(DocumentOCRResult(
-            inbox_item_id=inbox_item.id,
-            org_id=current_user.organization_id,
-            ocr_engine=ocr_engine,
-            raw_text=raw_text,
-            layout_json={
-                "pages": 1,
-                "extraction_source": ocr_engine,
-                "extraction_error": extraction_error,
-            },
-            pages=1,
-        ))
-
-    draft = db.query(DocumentDraft).filter(
-        DocumentDraft.inbox_item_id == inbox_item.id
-    ).first()
-    if not draft:
-        draft = DocumentDraft(
-            inbox_item_id=inbox_item.id,
-            org_id=current_user.organization_id,
-            client_id=inbox_item.client_id,
-            status="draft",
-        )
-        db.add(draft)
-        db.flush()
-    elif not draft.client_id and inbox_item.client_id:
-        # Update client_id if it was set on inbox item but not on draft
-        draft.client_id = inbox_item.client_id
-
-    draft.doc_type_guess = draft_data["doc_type"]
-    draft.counterparty_guess = draft_data["counterparty_name"]
-    draft.doc_date_guess = draft_data["doc_date"]
-    draft.currency_guess = draft_data["currency"]
-    draft.invoice_no_guess = draft_data["invoice_no"]
-    draft.totals_guess = {
-        "net": str(draft_data["totals"]["net"]),
-        "vat": str(draft_data["totals"]["vat"]),
-        "gross": str(draft_data["totals"]["gross"]),
-    }
-    draft.totals_confirmed = draft.totals_guess
-    draft.draft_json = {
-        "source": "claude-ocr",
-        "header": {
-            "doc_type": draft_data["doc_type"],
-            "counterparty_name": draft_data["counterparty_name"],
-            "doc_date": draft_data["doc_date"].isoformat() if draft_data["doc_date"] else None,
-            "due_date": draft_data["due_date"].isoformat() if draft_data["due_date"] else None,
-            "currency": draft_data["currency"],
-            "invoice_no": draft_data["invoice_no"],
-            "order_no": draft_data.get("order_no"),
-            "payment_terms": draft_data.get("payment_terms"),
-            "payment_status": draft_data.get("payment_status"),
-            "totals": draft.totals_guess,
-        },
-        "vendor": draft_data.get("vendor"),
-        "customer": draft_data.get("customer"),
-        "lines": [
-            {
-                "line_no": line["line_no"],
-                "description": line["description"],
-                "qty": str(line["qty"]),
-                "unit_price": str(line["unit_price"]),
-                "net": str(line["net"]),
-                "vat": str(line["vat"]),
-                "gross": str(line["gross"]),
-                "vat_code": line.get("vat_code"),
-                "nominal_code": line.get("nominal_code"),
-                "confidence": str(line.get("confidence")) if line.get("confidence") is not None else None,
-            }
-            for line in draft_data["lines"]
-        ],
-        "raw_text": draft_data.get("raw_text"),
-        "confidence": str(draft_data.get("confidence")) if draft_data.get("confidence") else None,
-    }
-    draft.validation_json = validation
-    draft.last_edited_by = current_user.id
-
-    db.query(DocumentDraftLine).filter(DocumentDraftLine.draft_id == draft.id).delete()
-    for line in draft_data["lines"]:
-        db.add(DocumentDraftLine(
-            draft_id=draft.id,
-            org_id=current_user.organization_id,
-            line_no=line["line_no"],
-            description_guess=line["description"],
-            description_confirmed=line["description"],
-            qty=line["qty"],
-            unit_price=line["unit_price"],
-            net=line["net"],
-            vat=line["vat"],
-            gross=line["gross"],
-            vat_code_guess=line.get("vat_code"),
-            vat_code_confirmed=line.get("vat_code"),
-            nominal_code_guess=line.get("nominal_code"),
-            nominal_code_confirmed=line.get("nominal_code"),
-            confidence=line.get("confidence"),
-        ))
-
-    inbox_item.status = "drafted"
-    db.commit()
-    db.refresh(draft)
-
-    return {
-        "draft": _draft_to_dict(draft, inbox_item),
-    }
+    return {"draft": _draft_to_dict(result.draft, result.inbox_item)}
 
 
 @router.get("/drafts/{draft_id}")
@@ -565,11 +355,17 @@ def update_draft(
     if draft.status == "submitted":
         raise HTTPException(status_code=400, detail="Draft is already submitted")
 
+    confirmed_contact = _resolve_confirmed_contact(
+        db,
+        draft=draft,
+        organization_id=current_user.organization_id,
+        requested_contact_id=payload.confirmed_contact_id,
+    )
     validation = _validate_totals(payload.lines, payload.totals)
 
     draft.doc_type_confirmed = payload.doc_type or draft.doc_type_confirmed
-    draft.counterparty_guess = payload.counterparty_name or draft.counterparty_guess
-    draft.counterparty_id = payload.counterparty_id or draft.counterparty_id
+    draft.confirmed_contact_id = confirmed_contact.id if confirmed_contact else None
+    draft.confirmed_contact = confirmed_contact
     draft.doc_date_confirmed = payload.doc_date or draft.doc_date_confirmed
     draft.currency_confirmed = payload.currency or draft.currency_confirmed or draft.currency_guess
     draft.invoice_no_confirmed = payload.invoice_no or draft.invoice_no_confirmed
@@ -586,12 +382,16 @@ def update_draft(
         "source": "user-edit",
         "header": {
             "doc_type": payload.doc_type,
-            "counterparty_name": payload.counterparty_name,
+            "counterparty_name": _observed_counterparty_name(draft),
             "doc_date": payload.doc_date.isoformat() if payload.doc_date else None,
             "due_date": payload.due_date.isoformat() if payload.due_date else None,
             "currency": payload.currency,
             "invoice_no": payload.invoice_no,
             "totals": draft.totals_confirmed,
+        },
+        "review": {
+            "confirmed_counterparty_name": payload.counterparty_name,
+            "confirmed_contact_id": str(draft.confirmed_contact_id) if draft.confirmed_contact_id else None,
         },
         "lines": [
             {
@@ -608,6 +408,7 @@ def update_draft(
             }
             for line in payload.lines
         ],
+        "suggestions": _existing_suggestions(draft),
     }
 
     db.query(DocumentDraftLine).filter(DocumentDraftLine.draft_id == draft.id).delete()
@@ -651,11 +452,17 @@ def submit_draft(
     if draft.status == "submitted":
         raise HTTPException(status_code=400, detail="Draft already submitted")
 
+    confirmed_contact = _resolve_confirmed_contact(
+        db,
+        draft=draft,
+        organization_id=current_user.organization_id,
+        requested_contact_id=payload.confirmed_contact_id,
+    )
     validation = _validate_totals(payload.lines, payload.totals)
 
     draft.doc_type_confirmed = payload.doc_type or draft.doc_type_confirmed
-    draft.counterparty_guess = payload.counterparty_name or draft.counterparty_guess
-    draft.counterparty_id = payload.counterparty_id or draft.counterparty_id
+    draft.confirmed_contact_id = confirmed_contact.id if confirmed_contact else None
+    draft.confirmed_contact = confirmed_contact
     draft.doc_date_confirmed = payload.doc_date or draft.doc_date_confirmed
     draft.currency_confirmed = payload.currency or draft.currency_confirmed or draft.currency_guess
     draft.invoice_no_confirmed = payload.invoice_no or draft.invoice_no_confirmed
@@ -674,12 +481,16 @@ def submit_draft(
         "submitted_at": datetime.utcnow().isoformat(),
         "header": {
             "doc_type": payload.doc_type,
-            "counterparty_name": payload.counterparty_name,
+            "counterparty_name": _observed_counterparty_name(draft),
             "doc_date": payload.doc_date.isoformat() if payload.doc_date else None,
             "due_date": payload.due_date.isoformat() if payload.due_date else None,
             "currency": payload.currency,
             "invoice_no": payload.invoice_no,
             "totals": draft.totals_confirmed,
+        },
+        "review": {
+            "confirmed_counterparty_name": payload.counterparty_name,
+            "confirmed_contact_id": str(draft.confirmed_contact_id) if draft.confirmed_contact_id else None,
         },
         "lines": [
             {
@@ -696,6 +507,7 @@ def submit_draft(
             }
             for line in payload.lines
         ],
+        "suggestions": _existing_suggestions(draft),
     }
 
     db.query(DocumentDraftLine).filter(DocumentDraftLine.draft_id == draft.id).delete()
@@ -756,6 +568,12 @@ def submit_draft(
         transaction.transaction_date = transaction_date
         transaction.due_date = payload.due_date
         transaction.status = "submitted"
+
+    record_reviewed_outcome(
+        db,
+        draft=draft,
+        actor_user_id=current_user.id,
+    )
 
     db.commit()
     db.refresh(draft)

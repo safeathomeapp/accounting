@@ -112,14 +112,6 @@ export default function App() {
             }
           />
           <Route
-            path="/documents/review"
-            element={
-              <ProtectedRoute>
-                <DocumentReview />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/client/:clientId/documents/review"
             element={
               <ProtectedRoute>

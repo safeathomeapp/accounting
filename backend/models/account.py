@@ -149,6 +149,11 @@ class Account(Base):
         back_populates="account",
         lazy="select"
     )
+    client_accounting_patterns = relationship(
+        "ClientAccountingPattern",
+        back_populates="suggested_nominal_account",
+        lazy="select",
+    )
 
     # Unique constraint: code per client (each client has their own chart of accounts)
     __table_args__ = (

@@ -179,6 +179,31 @@ class Client(Base):
         lazy="select",
         cascade="all, delete-orphan"
     )
+    intelligence_profile = relationship(
+        "ClientIntelligenceProfile",
+        back_populates="client",
+        uselist=False,
+        lazy="select",
+        cascade="all, delete-orphan",
+    )
+    supplier_aliases = relationship(
+        "ClientSupplierAlias",
+        back_populates="client",
+        lazy="select",
+        cascade="all, delete-orphan",
+    )
+    accounting_patterns = relationship(
+        "ClientAccountingPattern",
+        back_populates="client",
+        lazy="select",
+        cascade="all, delete-orphan",
+    )
+    intelligence_events = relationship(
+        "ClientIntelligenceEvent",
+        back_populates="client",
+        lazy="select",
+        cascade="all, delete-orphan",
+    )
 
     # Composite index for platform reference uniqueness
     __table_args__ = (
